@@ -71,4 +71,4 @@ my $dbh = DBI->connect("dbi:mysql:database=$db_name;host=localhost", 'trac_maste
 
 以上、備忘録として。
 
-!# つーかもう、 MySQL 使うのやめようかな… ('A!`)=3
+\# つーかもう、 MySQL 使うのやめようかな… ('A\`)=3
