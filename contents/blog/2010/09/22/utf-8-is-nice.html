@@ -1,0 +1,35 @@
+<h1>UTF-8 もイマイチだが…</h1>
+
+<div class="entry">
+<p><a href="/blog/2010/09/22/u32regex-bad-cast.html" title="はらぺこ日誌» ブログアーカイブ » char32_t だと regex が使えない">UTF-32 が内部文字列に使えないことがわかった</a>ので、 UTF-8 を内部文字列に使用するというルールで libiconv によるエンコーディング操作と Boost.Regex による正規表現の両方を同時に試すサンプルを作成してみました。</p>
+<ul>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.hpp">sample/EncodeString.hpp</a></li>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.cpp">sample/EncodeString.cpp</a></li>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/regex-test.cpp">sample/regex-test.cpp</a></li>
+</ul>
+<p>Makefile は作ってません＼(^O^)／。試してみたい人は頑張ってコンパイルしてねｗ</p>
+<pre>
+$ g++ -std=c++0x -o regex-test regex-test.cpp EncodeString.cpp -lboost_regex
+</pre>
+<p>まともな環境 (Linux + GCC4.5 とか) なら上記コマンドで通るはず。libiconv を (glibc に上書きする形で) インストールしている場合は <code>-liconv</code> を末尾に入れる必要があるかも。そして MinGW を使う場合は更にもう一工夫必要かも <tt>(((;/^^)/</tt><br/>
+<span id="more-138"></span><br/>
+さてこのプログラム、注目して頂きたいのは、<code>regex-test.cpp</code> の以下の行です。</p>
+<pre>
+        regex reg(u8"くま|川|(お)?魚");
+</pre>
+<p>正規表現を定義しているのですが、一文字でしかないはずの <code>"お"</code> がわざわざ丸括弧でくくってありますね。これが Perl で <code>use utf8;</code> していたり、 UTF-8 で JavaScript を書いていたりしているのであれば、不要な括弧です。</p>
+<p>しかし、 Boost.Regex を UTF-8 で使用する場合には必要です。この括弧がなければ、 <code>"?"</code> は <code>"お"</code> の最終オクテットにしか適用されません。なぜなら、 Boost.Regex は UTF-8 なんて知らないので、 <code>"お"</code> が論理的には 1文字でしかない、なんてことは認識できないからです。</p>
+<p>すなわち、</p>
+<pre>
+        regex reg(u8"くま|川|お?魚");
+</pre>
+<p>と書いてしまうと、<code>"お魚"</code> には hit しますが、 <code>"魚"</code> には hit しなくなってしまうのです。</p>
+<p>otoco では、 MML コンパイラ機能において、プログラマブルマクロを定義できる機能を提供する予定です。具体的には Lua でマクロを定義し、そのマクロを用いて生成した MML をインライン展開できるようにする、といったものです (実際の所、言語に Lua を採用すべきか JavaScript を採用すべきか、はたまた Python を採用すべきかで迷っているところではあるのですが…)。</p>
+<p>で、 (Lua を採用する場合には) 正規表現を用いた文字列加工を行う関数を提供するつもりでいるのですが (JavaScript とかだったら不要なんですけどね、言語機能にあるし)、仮に非 ASCII な文字 (列) を hit させようとする正規表現に <code>"?"</code> やら <code>"[</code>…<code>]"</code> やらが使われた場合、どう扱うべきなんだろう、といった辺りが悩みどころではあったりします…。</p>
+<p>まぁなんにせよ、他に選択の余地もないので、とりあえず内部文字列は UTF-8 で実装するという方針でやっていくことにしようかと思います。前途多難じゃ… orz</p>
+<p><small>2010 年 9 月 22 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

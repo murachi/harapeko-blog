@@ -1,0 +1,82 @@
+<h1>Windows で Boost セットアップ</h1>
+
+<div class="entry">
+<p>Windows 環境で Boost ライブラリをセットアップしてみました。明日は Linux 環境でもセットアップを行い、<a href="/trac-wiki/otoco/%E6%8A%80%E8%A1%93%E3%83%A1%E3%83%A2/Boost%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97.html">技術メモ</a>としてまとめる<a href="http://developer.harapeko.jp/trac/original/otoco/ticket/3">予定</a>です。</p>
+<p>で、せっかくなので、試しに簡単なサンプルを作って動作確認をしてみました。</p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;string&gt;
+
+#include &lt;boost/regex.hpp&gt;
+
+using namespace std;
+using namespace boost;
+
+void escapeHtml(const string &amp;src, string &amp;modified);
+
+int main(int argc, char* argv[])
+{
+	for (int i = 1; i &lt; argc; i++)
+	{
+		ifstream fin(argv[i]);
+		if (fin.bad() || fin.fail())
+		{
+			cerr &lt;&lt; argv[0] &lt;&lt; ": Can't open " &lt;&lt; argv[i] &lt;&lt; "." &lt;&lt; endl;
+			continue;
+		}
+		while (!fin.eof())
+		{
+			string line;
+			getline(fin, line);
+			string modified;
+			escapeHtml(line, modified);
+			cout &lt;&lt; modified &lt;&lt; endl;
+		}
+	}
+	
+	return 0;
+}
+
+void escapeHtml(const string &amp;src, string &amp;modified)
+{
+	modified.clear();
+	sregex_iterator last_it;
+	for (sregex_iterator it(src.begin(), src.end(), regex("[&lt;&gt;&amp;\"]")); it != sregex_iterator(); it++)
+	{
+		modified += it-&gt;prefix().str();
+		string sub = (*it)[0].str();
+		switch (sub[0])
+		{
+			case '&lt;':	modified += "&amp;lt;";		break;
+			case '&gt;':	modified += "&amp;gt;";		break;
+			case '&amp;':	modified += "&amp;amp;";	break;
+			case '"':	modified += "&amp;quot;";	break;
+			default:	assert(0);	break;
+		}
+		last_it = it;
+	}
+	modified += last_it == sregex_iterator() ? src : last_it-&gt;suffix().str();
+}
+</pre>
+<p><a href="http://boost.cppll.jp/HEAD/libs/regex/doc/regex_iterator.html">Boost.Regex の regex_iterator</a> を用いたテストです。よーするに、コマンドに指定したファイルの HTML エスケープ処理を施してコンソールに書き出すプログラムです。</p>
+<p>上記のプログラムを test.cpp などのファイル名で保存し、そのまま Visual Studio 2008 コマンドプロンプト上で</p>
+<pre>
+cl test.cpp
+</pre>
+<p>とやってみましたが、これだけではコンパイルできませんでした。どうやら、 Visual Studio のオプションダイアログでヘッダーファイルやライブラリの参照先ディレクトリを設定しても、その設定が参照されるのは Visual Studio の IDE からビルドを実行した場合のみのようです。あるいは、環境変数 INCLUDE や LIB を設定してあげればこれでコンパイルできるのかも知れません。その辺はまた追々調べてみますが、最終的には <code>.configure</code> に <code>--boost-prefix</code> といったようなオプションを設ける、といった形の対応になるのではないかとも思います。</p>
+<p>ちなみに、これと同等の (しかもより確実に動作する) プログラムを Perl で記述すると、以下の通りになります (この書き方はしかし Unix 風環境限定ですが)。</p>
+<pre>
+#!/usr/bin/perl -p
+s/[&lt;&gt;&amp;"]/'&amp;'.{qw(&lt; lt &gt; gt &amp; amp " quot)}-&gt;{$&amp;}.';'/eg;
+</pre>
+<p>うあー、やっぱりスクリプト言語は便利だなー (汗。</p>
+<hr/>
+<div>2009年  7月 28日 火曜日 16:56:07 JST – <strong>追記</strong></div>
+<p>egtra 様、ご指摘感謝です。仰る通り、 <code>string::getline()</code> を使った方がスマートなので、その通りに修正させて頂きました。</p>
+<p><small>2009 年 7 月 13 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

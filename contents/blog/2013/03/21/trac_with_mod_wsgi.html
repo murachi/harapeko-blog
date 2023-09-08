@@ -1,0 +1,38 @@
+<h1>Trac で .wsgi ファイルを複数設定する場合の留意点</h1>
+
+<div class="entry">
+<p>小ネタですが…</p>
+<blockquote cite="http://developer.harapeko.jp/trac/original/ideanote/wiki/TracModWSGI" title="Trac と mod_wsgi">
+<p>
+<strong>重要な Note:</strong> 複数の <tt>.wsgi</tt> ファイルを使用する場合 (それぞれのファイルに別個の Trac environment を設定するケースなど) は、 <tt>os.environ['TRAC_ENV']</tt> には Trac environment のパスを <em>設定しない</em> でください。この方法を使うと、別の Trac environment の設定が Trac にロードされてしまうことがあります。 (以前にロードした Trac environment のパスが使われてしまいます。) この問題は <tt>.wsgi</tt> ファイルの内容を下記の通り変更することで回避できます:
+</p>
+<div class="code">
+<pre><span class="kn">import</span> <span class="nn">os</span>
+
+os<span class="o">.</span>environ<span class="p">[</span><span class="s">'PYTHON_EGG_CACHE'</span><span class="p">]</span> <span class="o">=</span> <span class="s">'/usr/local/trac/mysite/eggs'</span>
+
+<span class="kn">import</span> <span class="nn">trac.web.main</span>
+<span class="k">def</span> <span class="nf">application</span><span class="p">(</span>environ<span class="p">,</span> start_response<span class="p">):</span>
+  environ<span class="p">[</span><span class="s">'trac.env_path'</span><span class="p">]</span> <span class="o">=</span> <span class="s">'/usr/local/trac/mysite'</span> 
+  <span class="k">return</span> trac<span class="o">.</span>web<span class="o">.</span>main<span class="o">.</span>dispatch_request<span class="p">(</span>environ<span class="p">,</span> start_response<span class="p">)</span>
+</pre>
+</div>
+</blockquote>
+<p><span id="more-283"></span><br/>
+ここで、</p>
+<pre>
+os.environ['TRAC_ENV_PARENT_DIR'] = '/path/to/parent-dir'
+</pre>
+<p>を使っていた場合、これを回避コードに置き換えるには、 <code>environ</code> の添え字を <code>'trac.env_parent_dir'</code> としてあげればいいみたいです。</p>
+<pre>
+def application(environ, start_response):
+        environ['trac.env_parent_dir'] = '/path/to/parent-dir'
+        return trac.web.main.dispatch_request(environ, start_response)
+</pre>
+<p>弊社の場合、一方を公開のプロジェクト、もう一方を非公開のプロジェクト (SSL 通信限定でパスワード保護) としていたのに、リロード繰り返したら公開の方の URL が非公開の内容を指していたりで機密的にかなりやばいことになっていた <tt>(^_^;;;</tt> ので、似たようなことをやろうとしている方は厳重に注意が必要です…。</p>
+<p><small>2013 年 3 月 21 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

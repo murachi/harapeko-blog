@@ -1,0 +1,148 @@
+<h1>DataTable から値を引っ張る方法あれこれ</h1>
+
+<div class="entry">
+<p>C# で DB を扱う場合などで、よく DataTable を使うことになると思うのですが、こいつから値を取り出すときの書き方が人によって結構まちまちだな、と思うことが結構あるので、ちょっとおさらいしてみることにします。</p>
+<p>今回は割と初歩的な内容になります。あと、記事中のコードはテストしてないので動作を保証できません。<br/>
+<span id="more-287"></span></p>
+<h3>方法1. 普通にキャストする</h3>
+<pre>
+DataTable table = view.Select();
+foreach (var row in table)
+{
+    var seq = (int)row["HOGE_CD"];
+    var name = (string)row["HOGE_NAME"];
+
+    var remark = row["HOGE_REMARK"].GetType() == typeof(string) ?
+        (string)row["HOGE_REMARK"] : null;
+
+    // 処理 ...
+
+}
+</pre>
+<p>NULL を許容するフィールドについては型チェックを行う必要がある、というのがポイントになります。 NULL 値は <code>null</code> ではなく <code><a href="http://msdn.microsoft.com/ja-jp/library/system.dbnull.aspx">DBNull</a>.Value</code> として入ってくるので、そのままキャストしようとすると <code><a href="http://msdn.microsoft.com/ja-jp/library/system.invalidcastexception.aspx">InvalidCastException 例外</a></code> が送出される場合があるからです。</p>
+<h3>方法2. <code>as</code> 演算子を使う</h3>
+<pre>
+DataTable table = view.Select();
+foreach (var row in table)
+{
+    var seq = row["HOGE_CD"] as int?;
+    var name = row["HOGE_NAME"] as string;
+    var remark = row["HOGE_REMARK"] as string;
+
+    // 処理 ...
+
+}
+</pre>
+<p><a href="http://msdn.microsoft.com/ja-jp/library/vstudio/cscsdfbt.aspx"><code>as</code> 演算子</a>は、型キャストが可能ならばキャストを行い、不可能な場合は <code>null</code> を返すという、最近ありがちなフレームワークでの頻繁に down cast を要求するような実装においては非常に便利な演算子です。 C++ で言うところの <code>dynamic_cast</code> 演算子に似ています (なので、個人的にはなるべく避けたい、頼り切りたくない概念なのですが…)。</p>
+<p>普通に型キャストを行う方法に比べると、 NULL 許容フィールドに対しても同じように書けるため、非常にすっきりします。しかし、 <code>int</code> のような据え置き型などの、 <code>null</code> を許容しない型 (.NET では<a href="http://msdn.microsoft.com/ja-jp/library/vstudio/zcx1eb1e.aspx#Structures">構造体</a>と呼ばれているもの) に対して使うことは出来ません。その為、 <code>int</code> 型の値を取得する際には、指定する型を <code>int?</code> 型としているのがポイントです。これは、以下のように書くのと同じ意味になります。</p>
+<pre>
+    var seq = row["HOGE_CD"] as <a href="http://msdn.microsoft.com/ja-jp/library/b3h38hb0.aspx">Nullable</a>&lt;int&gt;;
+</pre>
+<p><code>Nullable&lt;T&gt;</code> 構造体は <code>null</code> を許容する特殊な構造体という位置づけで、通常の値型の値と同じように四則演算や比較演算を行うことも出来たりします。但し、元の値型が要求される場面ではそのまま渡すことは出来ないので、 <code>null</code> チェックをしてから <code>Value</code> プロパティを使う必要があります。</p>
+<pre>
+    if (seq.HasValue)   // null ではないことを確認
+        MyMethod(seq.Value, name, remark);
+    else
+    {
+        // nul だった場合の処理 ...
+    }
+</pre>
+<h3>方法3. <code>object.ToString()</code> メソッドを使う</h3>
+<p><a href="http://msdn.microsoft.com/ja-jp/library/system.dbnull.tostring.aspx" title="DBNull.ToString メソッド (System)"><code>DBNull.ToString()</code> が常に <code>string.Empty</code> を返す</a>ことを逆手にとり、元の値の型に関係なく手当たり次第に <code>ToString()</code> を呼んでしまえという考え方もあったりします。そのまま文字列で出力することの多い ASP.NET での開発などでは割とよく見かける手法です。</p>
+<pre>
+DataTable table = view.Select();
+foreach (var row in table)
+{
+    var seq = row["HOGE_CD"].ToString();
+    var name = row["HOGE_NAME"].ToString();
+    var remark = row["HOGE_REMARK"].ToString();
+
+    // 処理 ...
+
+}
+</pre>
+<p>数値が入るフィールドの値をそのまま文字列として出力したいようなケースでは便利です。但し、 <code>DateTime</code> 型のように、そのまま <code>ToString()</code> してしまうと必ずしも期待した通りの表示にならないものもあるので、注意が必要です。</p>
+<p>文字列型のフィールドの場合、単に出力する用途であれば <code>null</code> が許容されるケースが殆どなので (文字列連結演算でも <code>null</code> の混在は許容されています)、 <code>as</code> 演算子を用いる方法の方が適切かも知れません。そうでない場合は、それこそ NULL 値をチェックして分岐するようなコーディングが必要なことが殆どであるハズなので、やはり <code>as</code> 演算子を用いる方法の方が適切であるといえます。</p>
+<h3>方法4. <code>object</code> 型のまま用いる</h3>
+<p><code>ToString()</code> メソッドの利用にも通じるのですが、 例えば値の比較にのみ用いるので <code>object.Equal()</code> メソッドを呼べばいいか、みたいな使い方もあり得ます。</p>
+<pre>
+DataTable table = view.Select();
+foreach (var row in table)
+{
+    // ...
+
+    // 特定のステータスのレコードに対してのみ、何か特別な処理をさせたい場合など
+    if (row["HOGE_STATUS"].Equal(MyConstant.HogeStatus.SpecialState))
+    {
+        // 処理...
+    }
+}
+</pre>
+<p>あるいは、そもそも <code>object</code> 型の値を要求するようなメソッドやプロパティに渡して用いるようなケースでは、わざわざ型キャストしてやる必要もないでしょう。 <code>StringBuilder</code> を用いて値を連結して使う場合なんかもそうですね。</p>
+<h3>まとめ</h3>
+<p>どの方法にもそれぞれ利点はあるので、ケースバイケースで使い分けると良いのではないかと思います。指針としてはこんな感じになるでしょうか。</p>
+<table>
+<tr>
+<th>方法</th>
+<th>コード例</th>
+<th>有効な用途</th>
+<th>注意点</th>
+</tr>
+<tr>
+<td>普通に型キャスト</td>
+<td>
+<code>var seq = (int)row["HOGE_CD"];</code><br/>
+<code>var status = row["HOGE_STATUS"].GetType() == typeof(int) ? (int)row["HOGE_STATUS"] : -1;</code>
+</td>
+<td>
+<code>null</code> を許容しない型の値を取り出して評価したい場合。<br/>
+      または NULL 値を許容しないフィールドであることが分かっている場合。
+    </td>
+<td>
+      NULL 値が入ってくるフィールドの場合、NULL チェックを怠ると型キャストに失敗して例外が送出されることがある。
+    </td>
+</tr>
+<tr>
+<td><code>as</code> 演算子</td>
+<td>
+<code>var seq = row["HOGE_CD"] as int?;</code><br/>
+<code>var name = row["HOGE_NAME"] as string;</code>
+</td>
+<td>
+      この書き方が煩雑ではなく、 <code>Nullable&lt;T&gt;</code> 構造体を用いるのが嫌でなければ、多くのケースで適当。<br/>
+<code>null</code> を許容する <code>string</code> 型の場合は特に有効。
+    </td>
+<td>
+<code>null</code> を許容しない <code>int</code> 型や <code>DateTime</code> 型などの値の場合には、 <code>Nullable&lt;T&gt;</code> 構造体を用いた型 (<code>int?</code> など) で値を扱う必要がある。
+    </td>
+</tr>
+<tr>
+<td><code>object.ToString()</code> メソッド</td>
+<td>
+<code>hogeSeqNo_Label.Text = row["HOGE_SEQ"].ToString();</code>
+</td>
+<td>
+      とにかく文字列として扱いたい場合。
+    </td>
+<td>
+</td>
+</tr>
+<tr>
+<td>そのまま <code>object</code> として扱う</td>
+<td>
+<code>object.Equal()</code> メソッドを用いた値の比較。<br/>
+<code>StringBuilder</code> の利用等、 <code>object</code> 型の引数が要求されるケース。
+    </td>
+<td>
+<code>object</code> 型のままで済む場合。
+    </td>
+<td>
+</td>
+</tr>
+</table>
+<p><small>2013 年 6 月 10 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

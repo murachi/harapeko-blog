@@ -1,0 +1,185 @@
+<h1>Apache 周りの設定と、WebDAV 設定</h1>
+
+<div class="entry">
+<p>会社サーバー絡みで最近行った設定に関するメモです。<br/>
+<span id="more-144"></span></p>
+<h3>サーバー全体の動作が重くなるのをどうにかする</h3>
+<p>さくらの VPS を利用するようになってから、サーバー全体の動作が重いのが気になっていました。結論から言うと、 Apache がメモリーを食いつぶし、スワップを引き起こしまくっていたからでした。</p>
+<p>Trac のページやこのブログ、会社のトップページでさえ、表示するのにやたらと時間がかかるので、 ssh で接続して状況を見ようとすると、その ssh での応答も非常に時間がかかるという状態。まさかこれが単体の専用サーバーと VPS の差だとは到底思えなかったので、 ps -AF するなり top するなりして軽く状況を見てみると、メモリーどころかスワップ領域もほぼフル回転で httpd が食いつぶしていた。こりゃああかんと言うことで、ネットで調べつつ設定を修正…。</p>
+<h4>起動するプロセスの数を減らす</h4>
+<p>とりあえず応急処置と言うことで、一度に起動するプロセスの数を減らすことを考えてみた。以下のサイトが参考になりました。</p>
+<ul>
+<li><a href="http://labs.unoh.net/2008/03/apache_mpm.html">ウノウラボ Unoh Labs: Apache MPM の基礎をしっかりと理解しよう！</a></li>
+</ul>
+<p>まず <a href="http://httpd.apache.org/docs/2.2/mpm.html" title="マルチプロセッシングモジュール (MPM) - Apache HTTP サーバ">MPM</a> に何を選択しているのかを知る必要があります。 CentOS を採用しているさくらの VPS では prefork MPM が選択されていました。</p>
+<pre>
+$ cat /etc/sysconfig/httpd
+# Configuration file for the httpd service.
+
+#
+# The default processing model (MPM) is the process-based
+# 'prefork' model.  A thread-based model, 'worker', is also
+# available, but does not work with some modules (such as PHP).
+# The service must be stopped before changing this variable.
+#
+#HTTPD=/usr/sbin/httpd.worker
+
+(以下略)
+</pre>
+<p>その場合、 httpd.conf ファイルにて修正すべきは、以下の部分と言うことになります。</p>
+<pre>
+&lt;IfModule prefork.c&gt;
+StartServers       8
+MinSpareServers    5
+MaxSpareServers   20
+ServerLimit      256
+MaxClients       256
+MaxRequestsPerChild  4000
+&lt;IfModule&gt;
+</pre>
+<p>基本的に社員2名の会社で社内サービスがメイン、会社サイトもこのブログもそれほど頻繁にアクセスされているわけでもないのに、プロセス 256個同時起動はまずあり得ないでしょう。プロセス 1つで 70MB ぐらい消費してしまうのに、メモリー 512MB、スワップ領域 2GB でプロセスをそんなに確保できるわけがありません。</p>
+<p>また、待機するプロセス数の最大 20も大きすぎます。一度作られた待機プロセスは Apache を再起動でもしない限りは残ったままになってしまうらしく、メモリー使用量を抑えたいのであれば、この数を減らしてやる必要があります。</p>
+<p>というわけで、変更後の内容は以下の通りです。</p>
+<pre>
+&lt;IfModule prefork.c&gt;
+StartServers       8
+MinSpareServers    5
+MaxSpareServers   10
+ServerLimit       15
+MaxClients        15
+MaxRequestsPerChild  4000
+&lt;/IfModule&gt;
+</pre>
+<p>とりあえずこの設定で数日間動かしてみたところ、それでもまだメモリーは景気よく食いつぶされているものの、重たくて使い物にならないような状況には至らなくなりました。</p>
+<h4>使わなさそうなモジュールをざっくり外す</h4>
+<p>1つ1つのプロセスが消費するメモリー容量がそもそも大きいので、シェイプアップも図ってみることにしました。デフォルトでロードするよう設定されているモジュール類でも、必ずしも全て必要なわけではなく、使わないモジュールを外すことでメモリー使用量を抑えることができるという<a href="http://memo.majide.com/index.php?%A1%DAApache%A1%DB%A5%E2%A5%B8%A5%E5%A1%BC%A5%EB%A4%CE%BA%EF%BD%FC%A4%CB%A4%E8%A4%EA%A5%E1%A5%E2%A5%EA%A4%F2%C0%E1%CC%F3%A4%B9%A4%EB" title="【Apache】モジュールの削除によりメモリを節約する - (・∀・)イイ!!Memo">情報</a>を見つけたので、<a href="http://httpd.apache.org/docs/2.2/mod/" title="モジュール一覧 - Apache HTTP サーバ">Apache のドキュメント</a>とにらめっこしながら、今は使っていないし近い将来使う予定もなさそうなモジュールを威勢よく外してみました。</p>
+<pre>
+LoadModule auth_basic_module modules/mod_auth_basic.so
+LoadModule auth_digest_module modules/mod_auth_digest.so
+LoadModule authn_file_module modules/mod_authn_file.so
+#LoadModule authn_alias_module modules/mod_authn_alias.so
+#LoadModule authn_anon_module modules/mod_authn_anon.so
+#LoadModule authn_dbm_module modules/mod_authn_dbm.so
+LoadModule authn_default_module modules/mod_authn_default.so
+LoadModule authz_host_module modules/mod_authz_host.so
+LoadModule authz_user_module modules/mod_authz_user.so
+LoadModule authz_owner_module modules/mod_authz_owner.so
+#LoadModule authz_groupfile_module modules/mod_authz_groupfile.so
+#LoadModule authz_dbm_module modules/mod_authz_dbm.so
+LoadModule authz_default_module modules/mod_authz_default.so
+#LoadModule ldap_module modules/mod_ldap.so
+#LoadModule authnz_ldap_module modules/mod_authnz_ldap.so
+#LoadModule include_module modules/mod_include.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule logio_module modules/mod_logio.so
+LoadModule env_module modules/mod_env.so
+#LoadModule ext_filter_module modules/mod_ext_filter.so
+LoadModule mime_magic_module modules/mod_mime_magic.so
+LoadModule expires_module modules/mod_expires.so
+#LoadModule deflate_module modules/mod_deflate.so
+LoadModule headers_module modules/mod_headers.so
+#LoadModule usertrack_module modules/mod_usertrack.so
+LoadModule setenvif_module modules/mod_setenvif.so
+LoadModule mime_module modules/mod_mime.so
+LoadModule dav_module modules/mod_dav.so
+#LoadModule status_module modules/mod_status.so
+LoadModule autoindex_module modules/mod_autoindex.so
+#LoadModule info_module modules/mod_info.so
+LoadModule dav_fs_module modules/mod_dav_fs.so
+LoadModule vhost_alias_module modules/mod_vhost_alias.so
+LoadModule negotiation_module modules/mod_negotiation.so
+LoadModule dir_module modules/mod_dir.so
+#LoadModule actions_module modules/mod_actions.so
+#LoadModule speling_module modules/mod_speling.so
+#LoadModule userdir_module modules/mod_userdir.so
+LoadModule alias_module modules/mod_alias.so
+LoadModule rewrite_module modules/mod_rewrite.so
+#LoadModule proxy_module modules/mod_proxy.so
+#LoadModule proxy_balancer_module modules/mod_proxy_balancer.so
+#LoadModule proxy_ftp_module modules/mod_proxy_ftp.so
+#LoadModule proxy_http_module modules/mod_proxy_http.so
+#LoadModule proxy_connect_module modules/mod_proxy_connect.so
+#LoadModule cache_module modules/mod_cache.so
+#LoadModule suexec_module modules/mod_suexec.so
+#LoadModule disk_cache_module modules/mod_disk_cache.so
+#LoadModule file_cache_module modules/mod_file_cache.so
+#LoadModule mem_cache_module modules/mod_mem_cache.so
+LoadModule cgi_module modules/mod_cgi.so
+#LoadModule version_module modules/mod_version.so
+</pre>
+<p>厳密にはこれに加えて、さらに <code>conf.d/proxy_ajp.conf</code> や <code>conf.d/welcome.conf</code> の中身をコメントアウトしてみたりもしています。結果として、メモリー使用量はプロセス当たり 70MB ぐらいだったのが 50MB ぐらいまでスリムアップしました。</p>
+<h3>WebDAV 設定</h3>
+<p>社内で一時的なファイルのやりとりをするのに使用する共有フォルダ的なものが欲しかったので、WebDAV を設定して Web フォルダとして使用することにしました。要件としては以下の通りです。</p>
+<ul>
+<li>クライアントは Windows および Mac OS X (あとたまに Ubuntu)。</li>
+<li>社外には公開しない。
+<ul>
+<li>認証が必要。匿名アクセスは不許可。</li>
+<li>SSL による通信の保護が必要。</li>
+</ul>
+</li>
+</ul>
+<p>まず、SSL を使用するため、 developer.harapeko.jp サブドメインを使用することにしました。 WebDAV の為のディレクトリは、 developer.harapeko.jp サブドメイン用に用意しているディレクトリ下に作成することにします。</p>
+<pre>
+$ mkdir -p /var/www/vhosts/developer/dav/davroot
+</pre>
+<p><code>dav</code> ディレクトリ、<code>dav/davroot</code> ディレクトリの両方に、 apache ユーザーが書き込みを行う権限が必要です。</p>
+<p>次に、ダイジェスト認証用の認証ファイルを <code>dav</code>ディレクトリ下に作成します。 realm を <code>DAV</code> とする場合、</p>
+<pre>
+$ htdigest -c /var/www/vhosts/developer/dav/.htdigest DAV murachi
+</pre>
+<p>とかやって、パスワードを設定します。 2人目以降は <code>-c</code> オプションは不要です。</p>
+<p>そして、<code>conf.d/ssl.conf</code> (SSL が適用されているヴァーチャルホストに対して設定を行うので、<code>conf/httpd.conf</code> ではないという点に注意) の <code>&lt;VirtualHost&gt;</code> セクション内に、以下の設定を書き加えました。</p>
+<pre>
+&lt;ifmodule mod_dav.c&gt;
+    DavLockDB /var/www/vhosts/developer/dav/DavLock
+
+    Alias /dav /var/www/vhosts/developer/dav/davroot
+    &lt;Location /dav&gt;
+        Order Allow,Deny
+        Allow from all
+        Options +Indexes
+        Dav On
+
+        AuthType Digest
+        AuthName DAV
+        AuthUserFile /var/www/vhosts/developer/dav/.htdigest
+        &lt;LimitExcept OPTIONS&gt;
+            Require valid-user
+        &lt;/LimitExcept&gt;
+    &lt;/Location&gt;
+    &lt;Location /&gt;
+        Header add MS-Author-Via "DAV"
+    &lt;/Location&gt;
+&lt;/ifmodule&gt;
+</pre>
+<p>あとは Apache を再起動すれば ok です。</p>
+<p>設定ファイルについて軽く解説すると、まず、最後の</p>
+<pre>
+    &lt;Location /&gt;
+        Header add MS-Author-Via "DAV"
+    &lt;/Location&gt;
+</pre>
+<p>の部分は、Windows から Web フォルダとしてアクセスする場合に必ず必要になります。この記述がないと、Windows クライアントは <code>/_vti_inf.html</code> ファイルが見つからないなどという意味不明なエラーを吐いてこけてしまいます。この設定のロケーションは <code>/</code> でなければなりません。</p>
+<p>それから、</p>
+<pre>
+        &lt;LimitExcept OPTIONS&gt;
+            Require valid-user
+        &lt;/LimitExcept&gt;
+</pre>
+<p>の部分は、本来であれば</p>
+<pre>
+        Require valid-user
+</pre>
+<p>のみであるべきなのですが、Digest 認証を用いる場合には、上記のように書かないと、やはり Windows の Web フォルダとして利用することができません。これはどうやら Windows の (IE の?) バグのようで、 OPTIONS メソッドでアクセスする際にのみ、 Digest 認証が理解できないからなのだそうです。</p>
+<p>この辺の、 Windows の Web フォルダ機能に絡んだ設定方法については、以下のサイトが参考になりました。</p>
+<ul>
+<li><a href="http://kamoland.com/wiki/wiki.cgi?WebDAV%A5%B5%A1%BC%A5%D0%A4%CE%B9%BD%C3%DB">WebDAVサーバの構築 – KamoLand</a></li>
+<li><a href="http://d.hatena.ne.jp/rero/20050524/p2">Web フォルダで WebDAV – reroの日記</a></li>
+</ul>
+<p><small>2010 年 11 月 5 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

@@ -1,0 +1,106 @@
+<h1>Python 習得中 – その 4</h1>
+
+<div class="entry">
+<p>今日は 4章の 4.5節まで。</p>
+<p><span id="more-395"></span></p>
+<h3>複数の不等号を含む評価式が書ける</h3>
+<p>変数が取りうる値の範囲を調べる場合、その変数を <code>and</code> を挟んで 2回書く代わりに、複数の不等号を含む単一の評価式として書くことができる。</p>
+<pre>
+&gt;&gt;&gt; x = 7
+&gt;&gt;&gt; 5 &lt; x &lt; 10
+True
+&gt;&gt;&gt; x = 2
+&gt;&gt;&gt; 5 &lt; x &lt; 10
+False
+&gt;&gt;&gt; y = 200
+&gt;&gt;&gt; 0 &lt; x &lt; 100 &lt; y &lt; 1000
+True
+</pre>
+<p>こういう書き方できればいいのになぁと思うことは多々あったが、実際できる言語が存在するんですなぁ…。</p>
+<h3>ループブロックの <code>else</code> 節</h3>
+<p>ループブロックに <code>else</code> 節をつけると、 <code>break</code> 等による中断以外でループ終了する時に呼ばれるようです。</p>
+<pre>
+&gt;&gt;&gt; numbers = []
+&gt;&gt;&gt; count = 0
+&gt;&gt;&gt; while count &lt; 5:
+...     val = input(str(count + 1) + "番目の整数を入力: ")
+...     if val == 'q':
+...             break
+...     numbers.append(int(val))
+...     count += 1
+... else:
+...     print(numbers, "の合計: ", sum(numbers))
+... 
+1番目の整数を入力: 1
+2番目の整数を入力: 2
+3番目の整数を入力: 3
+4番目の整数を入力: 5
+5番目の整数を入力: 7
+[1, 2, 3, 5, 7] の合計:  18
+</pre>
+<p>使いどころはそれなりにあると思うのですが、これに <code>else</code> の名を冠するのは正直わかりにくい気もします…。</p>
+<h3>いろいろと便利な <code>zip()</code> 関数</h3>
+<p>複数のシーケンスを並列的に反復処理できる。</p>
+<pre>
+&gt;&gt;&gt; pythonObj = 'tuple', 'list', 'dict', 'set'
+&gt;&gt;&gt; perlObj = 'list', 'list', 'hash', 'hash'
+&gt;&gt;&gt; cppObj = 'tuple', 'vector', 'unordered_map', 'unordered_set'
+&gt;&gt;&gt; mean = 'タプル', 'リスト (配列)', '辞書 (連想配列)', '集合'
+&gt;&gt;&gt; for py, pl, cpp, jp in zip(pythonObj, perlObj, cppObj, mean):
+...     print('Python: ' + py + ', Perl: ' + pl + ', C++: ' + cpp + \
+...     '\nこれは何? - ' + jp)
+... 
+Python: tuple, Perl: list, C++: tuple
+これは何? - タプル
+Python: list, Perl: list, C++: vector
+これは何? - リスト (配列)
+Python: dict, Perl: hash, C++: unordered_map
+これは何? - 辞書 (連想配列)
+Python: set, Perl: hash, C++: unordered_set
+これは何? - 集合
+</pre>
+<p>また、2つのシーケンスを <code>zip()</code> したものを <code>dict()</code> に食わせることで、一方をキー、他方を値とする辞書が作れる。</p>
+<pre>
+&gt;&gt;&gt; py2pl = dict(zip(pythonObj, perlObj))
+&gt;&gt;&gt; py2pl
+{'tuple': 'list', 'set': 'hash', 'dict': 'hash', 'list': 'list'}
+</pre>
+<h3>数列を作る <code>range()</code> 関数</h3>
+<p>リストのスライスが欲しいのではなく、数の並びそのものが欲しい場合は、 <code>range()</code> 関数を使えばいい。 Perl でいうところの範囲演算子 <q><code>..</code></q> のようなもので、スライスと同様に step も指定できます。</p>
+<pre>
+&gt;&gt;&gt; for x, y in zip(range(0, 3), range(3, 0, -1)):
+...     print("x:", x, "/ y:", y)
+... 
+x: 0 / y: 3
+x: 1 / y: 2
+x: 2 / y: 1
+</pre>
+<p><code>range(x, y)</code> で得られる数列の逆順が欲しい場合は、 <code>range(y, x, -1)</code> ではなく、 <code>range(y-1, x-1, -1)</code> とするか、または <code>range(x, y)[::-1]</code> とする必要があります。</p>
+<pre>
+&gt;&gt;&gt; list(range(0, 3))
+[0, 1, 2]
+&gt;&gt;&gt; list(range(3, 0, -1))
+[3, 2, 1]
+&gt;&gt;&gt; list(range(2, -1, -1))
+[2, 1, 0]
+&gt;&gt;&gt; range(0, 3)[::-1]
+range(2, -1, -1)
+</pre>
+<p>range にスライスを指定するとリストではなく新たな range を生成するのは面白い特性ですね。</p>
+<pre>
+&gt;&gt;&gt; range(0 ,100, 3)[10:20]
+range(30, 60, 3)
+&gt;&gt;&gt; range(0 ,100, 3)[30:10:-5]
+range(90, 30, -15)
+&gt;&gt;&gt; range(0 ,10, 3)[30:10:-5]
+range(9, 9, -15)
+&gt;&gt;&gt; range(0 ,50, 3)[30:10:-5]
+range(48, 30, -15)
+</pre>
+<p>…といった感じになるらしいです。</p>
+<p><small>2017 年 2 月 25 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

@@ -1,0 +1,94 @@
+<h1>Android プログラミング(4) – Activity の有効・無効</h1>
+
+<div class="entry">
+<p>シリーズとして、下記の書籍にて学習したことについてのメモを綴っています。</p>
+<ul>
+<li>
+<a href="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X">Android Hacks —プロが教えるテクニック &amp; ツール<br/>
+<img border="0" src="http://ws.assoc-amazon.jp/widgets/q?_encoding=UTF8&amp;Format=_SL160_&amp;ASIN=487311456X&amp;MarketPlace=JP&amp;ID=AsinImage&amp;WS=1&amp;tag=harapekoinc-22&amp;ServiceVersion=20070822"/></a>
+</li>
+</ul>
+<p>今回は、「HACK#7 アクティビティ Hacks」 (p.58～63) の内容について触れていきます。<br/>
+<span id="more-212"></span></p>
+<h3>adb コマンドからアクティビティを起動</h3>
+<p><code>adb</code> コマンドですが、<a href="/blog/2011/09/06/android-hacks-1.html" title="はらぺこ日誌? ブログアーカイブ ? Android プログラミング(1) - 開発環境の設定まで">SDK をインストール</a>した際にパスを通した <strong><code>tools</code> ディレクトリにはもはや存在しません</strong>。代わりに <code>adb_has_moved.txt</code> というふざけた名前のファイルが置いてあって、開くと次のように書かれています。</p>
+<pre>
+The adb tool has moved to platform-tools/
+
+If you don't see this directory in your SDK,
+launch the SDK and AVD Manager (execute the android tool)
+and install "Android SDK Platform-tools"
+
+Please also update your PATH environment variable to
+include the platform-tools/ directory, so you can
+execute adb from any location.
+</pre>
+<p>そんな訳なので、先ずはあらかじめ <q>(SDK インストールディレクトリ)<code>/platform-tools</code></q> ディレクトリにもパスを通しておきましょう。</p>
+<p><code>adb</code> コマンドを単に実行すると、 <code>shell</code> 以外のサブコマンドの説明も含むヘルプが表示されます。それを読むとわかるのですが、 <code>shell</code> サブコマンドからアクセスできるシェルというのは、<a href="/blog/2011/09/10/android-emurator.html" title="はらぺこ日誌? ブログアーカイブ ? Android プログラミング(2) - エミュレータ試行錯誤">エミュレータを弄る回</a>で扱ったエミュレータコンソールとは別物です。ちなみに、エミュレータコンソールのコマンドも <code>adb</code> コマンドの <code>emu</code> サブコマンドから実行できるようです。</p>
+<h3>アクティビティの有効・無効を動的に切り替える</h3>
+<p>このトピックは致命的なことに、アクティビティが有効になる/無効になると言うことがどういう事なのかがいまいちわかりづらくなっています。現象から言えることは、マニフェストに登録したアクティビティが <code>&lt;intent-filter&gt;</code> 要素を伴ってランチャーにアイコンを表示させるようにしていた場合、アクティビティが有効ならばそのアイコンが表示され、無効ならば表示されなくなる、ということだけでした。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_207" style="width: 410px"><a href="fig-20110925-launcher-enable-activity.png"><img alt="もう一つのアクティビティが有効なときのランチャー画面" class="size-full wp-image-207" height="285" src="fig-20110925-launcher-enable-activity.png" title="もう一つのアクティビティが有効なときのランチャー画面" width="400"/></a><p class="wp-caption-text">もう一つのアクティビティが有効なときのランチャー画面</p></div><br/>
+そこで、メインの方のアクティビティにボタンをもう一つ加えて、そのボタンを押すとサブの方のアクティビティに遷移するようにしてみました。よーするに、<a href="/blog/2011/09/15/activity-introduction.html" title="はらぺこ日誌? ブログアーカイブ ? Android プログラミング(3) - Activity 入門">前回</a>の前半でやった内容を組み合わせちゃったわけですね。<br/>
+参考までに、実際に実装したメインの方のアクティビティクラスの <code>onCreate()</code> ハンドラメソッドを以下に掲載します。
+<pre>
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+        
+        button_enable_branch = (Button)findViewById(R.id.bt_enable_branch);
+        button_to_branch = (Button)findViewById(R.id.bt_to_branch);
+        pack_man = getPackageManager();
+        com_name = new ComponentName(this, BranchActivity.class);
+        is_enable_branch_activity = !(pack_man.getComponentEnabledSetting(com_name) ==
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED);
+        setButtonText();
+        button_enable_branch.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (is_enable_branch_activity){
+                    pack_man.setComponentEnabledSetting(com_name, PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP);
+                }
+                else {
+                    pack_man.setComponentEnabledSetting(com_name, PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP);
+                }
+                is_enable_branch_activity = !is_enable_branch_activity;
+                setButtonText();
+            }
+        });
+        button_to_branch.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(RootActivity.this, BranchActivity.class));
+            }
+        });
+    }
+</pre>
+<p>例によって変数名とかは結構変えてありますｗ。 <code>RootActivity</code> がこのアクティビティで、 <code>BranchActivity</code> が (有効/無効を切り替えられる) サブの方のアクティビティですね。 <code>button_enable_branch</code> がこの有効/無効を切り替える方のボタン (本書のサンプルにあった <code>mButton</code> に相当する方ですね)、そして <code>button_to_branch</code> が <code>BranchActivity</code> クラスとして定義されたサブのアクティビティに遷移するボタン、ということになります。</p>
+<p>さて、このプログラムを実際に実行してみると、サブの方のアクティビティが有効な状態であれば (デフォルトではそうなっているはず)、以下のような画面が表示されます (ちなみに画像はちょうど「次の画面へ」ボタンを押しているところです)。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_210" style="width: 410px"><a href="fig-20110925-next-activity-enable-01.png"><img alt="もう一つのアクティビティが有効な状態の時に、そのアクティビティを開こうとしているところ。" class="size-full wp-image-210" height="285" src="fig-20110925-next-activity-enable-01.png" title="もう一つのアクティビティが有効な状態の時に、そのアクティビティを開こうとしているところ。" width="400"/></a><p class="wp-caption-text">もう一つのアクティビティが有効な状態の時に、そのアクティビティを開こうとしているところ。</p></div><br/>
+ここで「次の画面へ」ボタンを押すと、当然、サブの方のアクティビティの画面に遷移します。<br/>
+<div class="wp-caption aligncenter" id="attachment_211" style="width: 410px"><a href="fig-20110925-next-activity-enable-02.png"><img alt="もう一つのアクティビティは問題なく開く。" class="size-full wp-image-211" height="285" src="fig-20110925-next-activity-enable-02.png" title="もう一つのアクティビティは問題なく開く。" width="400"/></a><p class="wp-caption-text">もう一つのアクティビティは問題なく開く。</p></div><br/>
+さて、メインの方の画面に戻って、今度は一回「子のアクティビティを無効にする」ボタンを押して、サブの方のアクティビティを無効にしてから、「次の画面へ」ボタンを押してみることにします。<br/>
+<div class="wp-caption aligncenter" id="attachment_208" style="width: 410px"><a href="fig-20110925-next-activity-disable-01.png"><img alt="もう一つのアクティビティが無効な状態の時に、そのアクティビティを開こうとしているところ。" class="size-full wp-image-208" height="285" src="fig-20110925-next-activity-disable-01.png" title="もう一つのアクティビティが無効な状態の時に、そのアクティビティを開こうとしているところ。" width="400"/></a><p class="wp-caption-text">もう一つのアクティビティが無効な状態の時に、そのアクティビティを開こうとしているところ。</p></div><br/>
+…するとどうでしょう、今度は以下の画面のようなエラーを表示して、アプリケーションは終了してしまいました。<br/>
+<div class="wp-caption aligncenter" id="attachment_209" style="width: 410px"><a href="fig-20110925-next-activity-disable-02.png"><img alt="アクティビティは無効なので開くことができず、エラーを表示してアプリは終了する。" class="size-full wp-image-209" height="285" src="fig-20110925-next-activity-disable-02.png" title="アクティビティは無効なので開くことができず、エラーを表示してアプリは終了する。" width="400"/></a><p class="wp-caption-text">アクティビティは無効なので開くことができず、エラーを表示してアプリは終了する。</p></div><br/>
+ところでこの画面、前回も同じような画面を見たような気がします。そう、 <code>AndroidManifest.xml</code> ファイル、すなわちマニフェストに登録し忘れたアクティビティを開こうとしたときに表示されたのと同じエラー画面です。
+<p>実際、 Debug パースペクティブを開いてデバッグ実行してみると、この画面が表示されるまで進めた段階で、 LogCat に以下のようなログメッセージが出力されます。</p>
+<blockquote><p>
+09-25 08:48:58.955: ERROR/AndroidRuntime(468): android.content.ActivityNotFoundException: Unable to find explicit activity class {jp.co.harapeko.testsome/jp.co.harapeko.testsome.BranchActivity}; have you declared this activity in your AndroidManifest.xml?
+</p></blockquote>
+<p>これはまさしく、マニフェストに登録し忘れたアクティビティを開こうとしたときに出力されたのとまったく同じログメッセージです。すなわち、「アクティビティを無効にする」とは、「アクティビティがマニフェストに登録されていないような状態にする」ということなのでした。</p>
+<p>そんな訳なので、</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+この Hack を利用して、特定の条件を満たした時しか表示されないようなアイコンがある隠し機能があるアプリを作ると面白いかもしれませんね。
+</p></blockquote>
+<p>といったような使い方をするのであれば、アプリケーションの画面遷移図において隔離されている (その画面に遷移する画面が存在しない) 状態に設計されている必要がある、という注意事項をわきまえなければならないことになります。</p>
+<p>例えば、ゲームソフトのコンフィグでゲームのオープニングをスキップできるようにする場合、単純にオープニング用のアクティビティとゲーム本編用のアクティビティとでアイコンを差し替えるように作ろうとすると、ゲーム本編用のアクティビティを無効にした場合にゲーム本編が実行できなくなるという残念な障害にぶち当たるので、ゲーム本編に即座に飛ぶスキップ用のアクティビティを間に挟む必要があるよ、ということになるでしょう。</p>
+<p>今回は以上です。</p>
+<p><small>2011 年 9 月 25 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

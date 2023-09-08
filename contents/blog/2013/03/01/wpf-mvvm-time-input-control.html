@@ -1,0 +1,354 @@
+<h1>WPF と MVVM で時刻入力コントロール</h1>
+
+<div class="entry">
+<p>ご無沙汰しております。</p>
+<p>会社としての仕事がなかなか収入につながらないため、昨年の秋から個人事業主として某所で頂いた設計の仕事に従事しています。当初は 1～2ヶ月程度の短期の仕事として契約しておりましたが、のっぴきならない諸処の事情 <tt>(^-^;</tt> により、最低でも今月末まで、できればその後の開発の方にも～、ってな感じでなにげに長引きそうであります。</p>
+<p>お金がないので (泣、仕事があること自体はありがたいことではあります… 残業続きですでにへとへとですが。</p>
+<p>で、そのお仕事なのですが、 Windows 向けの業務アプリでありまして、開発には C# (Visual Studio 2010 / .NET 4.0) と WPF を利用することが決まっております。我々設計部隊も、画面イメージ作成のために XAML を書いたり、レビューの際の説明のために簡単な制御ロジックを書いたりもしています。</p>
+<p>まぁ画面作りに時間をかけてばかりも居られないので、たいていの人は WYSIWYG の XAML エディタで枠だけ書いて終わり、制御ロジックを書くにしても code behind に直接書くだけなのですが (そもそも WPF とか知らん、さらにいえばプログラミング自体ほとんど経験無いって人も少なくなく…)、開発工程にも関わる可能性があり、なおかつ WPF なんて現場ではほとんど使われていないために経験がある技術者が見つかりにくいという中で、いい機会なのでこの際勉強もかねて MVVM スタイルでの記述を心がけるようにしていたりするわけです。割と楽しいし。</p>
+<p>そんなわけで、当ブログではこれからしばらくの間、 WPF と MVVM 関連のネタを綴っていくことにしようかと思っております。どうぞお付き合いくださいませ…。<br/>
+<span id="more-277"></span></p>
+<h3>DatePicker はあるのに…</h3>
+<p>そんなわけで、今回は時刻を入力するコントロールの作り方について考えてみることにします。ありがちな課題だとは思うのですが、日付の入力は DatePicker があるのに時刻を入力するための適当なコントロールが見当たらなくてどうしようか、といった場合に、既製品をどこかから仕入れて組み込んでしまえばいいのですが、ライセンス管理がどうこうだの、バグがあった場合にどこまでサポートしてもらえるだの、それはそれで面倒なことも少なくないので、であれば適当に仕様を決めて作ってしまうのも手かなとか思ったりもするわけです。このくらいであればそんなに難しくもないですし。</p>
+<p>結論から (?) 言ってしまうと、できあがったサンプルプログラムを <a href="https://github.com/murachi/samples-for-blog/tree/master/wpf/TimeInputSample" title="amples-for-blog/wpf/TimeInputSample at master ・ murachi/samples-for-blog ・ GitHub">GitHub 上</a>で公開しています。何気に Git の練習も兼ねているという… <tt>(^^;</tt></p>
+<p><a href="20130202-wpf-fig01.png"><img alt="WPF + MVVM で時刻入力コントロール" class="aligncenter size-full wp-image-268" height="350" src="20130202-wpf-fig01.png" title="WPF + MVVM で時刻入力コントロール" width="525"/></a></p>
+<h3>とりあえず設計</h3>
+<p>あくまでサンプルなのでそんなに厳密な話はするつもりはないのですが、おおざっぱに仕様を決めておきましょう。</p>
+<ul>
+<li>入力するのは時と分だけとします。秒は扱いません。</li>
+<li><q><code>hh:mm</code></q>形式で表示します。但しコロンは固定、時と分でテキストボックスが分かれているイメージです。また、分は 2桁固定で 0 パディングします (時は 0 パディングしません)。</li>
+<li>時、分は普通にテキスト入力させます。スピンボタンとかは設けません。</li>
+<li>時、分のテキストボックスは、どちらも 2文字までしか入力を受け付けません。</li>
+<li>時、分のテキストボックスは、どちらもフォーカスを抜けた段階でバリデーションを行います。受け付けられない値が入力された場合は、元々入力されていた値 (空欄だった場合は空欄) に戻します。
+<ul>
+<li>空欄にすることは可能とします。</li>
+</ul>
+</li>
+<li>ちょっと細かい話ですが、時、または分のテキストボックスは、フォーカスを受け取ったら中身の数字を全選択状態にします。</li>
+<li>さらに細かい話ですが、分が空欄の状態で、時に有効な値が入力された (バリデーションをパスした) ら、その時点で時に「00」を設定します。利便性のための仕様ですね。</li>
+<li>時、分の両方に有効な値が入力されている場合のみ、「値がある」状態とします。それ以外の場合は「値がない」状態として扱います。</li>
+</ul>
+<h3>開発環境</h3>
+<p>Visual Studio は製品版である必要はありません。ていうかそんなお高いもの弊社の経済事情では調達できません <tt>(T-T)</tt>。普通に <a href="http://www.microsoft.com/visualstudio/jpn/downloads#d-csharp-2010-express">Visual C# 2010 Express</a> を使いましょう。</p>
+<p>※仕事の関係上、 Visual Studio 2012 / .NET 4.5 はノーチェックです。サンプルもあくまで 2010 をターゲットに作ってます。バージョンの変わり目っていろいろと面倒ですね… (‘A`)</p>
+<p>それから、 MVVM スタイルでのプログラミングと言うことで、 Expression Blend SDK が必須となっております (Expression Blend 自体が必要という話ではありません… あった方がいいんでしょうけど)。今回のサンプルでも使っているので、以下よりダウンロードしてインストールしてください。</p>
+<ul>
+<li><a href="http://www.microsoft.com/ja-jp/download/details.aspx?id=10801">Expression Blend 4 SDK for .NET 4 – Microsoft Download Center</a></li>
+</ul>
+<h3>ソリューションとかプロジェクトとか名前空間とか</h3>
+<p>ありがちな手法としてよく紹介されるのは、 Model、 View、 ViewModel の 3つに名前空間を分けましょう、といってフォルダを 3つ掘らせる (さらに Common とか掘らせちゃったりする) やり方だと思うのですが、 Model を単体テストさせることを念頭に置くのであれば、個人的には Model は名前空間ではなくてプロジェクト自体を分けちゃった方がいいんじゃないかとか思ったりするわけです。</p>
+<p>そんなわけで、今回のソリューションの構成は最終的には以下のような感じになりました。</p>
+<table>
+<caption>TimeInputSample ソリューションの構成</caption>
+<tr>
+<th>プロジェクト</th>
+<th>名前空間</th>
+<th>説明</th>
+</tr>
+<tr>
+<td rowspan="3">TimeInputSample</td>
+<td>TimeInputSample</td>
+<td>形骸化するｗメイン部分</td>
+</tr>
+<tr>
+<td>TimeInputSample.View</td>
+<td>View (XAML 置き場)</td>
+</tr>
+<tr>
+<td>TimeInputSample.ViewModel</td>
+<td>ViewModel やその他の制御ロジック</td>
+</tr>
+<tr>
+<td>TimeInputModel</td>
+<td>TimeInputModel</td>
+<td>Model</td>
+</tr>
+<tr>
+<td>TestTimeInputModel</td>
+<td>TestTimeInputModel</td>
+<td>Model 用の単体テスト</td>
+</tr>
+</table>
+<p>ちなみに今回は面倒なので <code>MainWindow.xaml</code> は名前空間 <code>TimeInputSample</code> から移動してません。本当はこれも <code>TimeInputSample.View</code> の配下に移動すべきなんでしょうが…。</p>
+<p>で、「最終的に」と書きましたが、何でかというと、この最終形態はあくまで実際に動いているところを見せるための使用例に過ぎず、今回のトピックのメインはあくまで時刻入力コントロールの実装方法だからです。</p>
+<h3>時刻入力コントロールの実装</h3>
+<h4>XAML</h4>
+<p>まず、プロジェクト上にユーザーコントロールを新規追加すると、デフォルトでは <code>&lt;UserControl&gt;</code> 要素に <code>d:DesignHeight</code> やら <code>d:DesignWidth</code> やらとありますが、これらは WYSIWYG エディタ上での表示の大きさが設定できるだけみたいです。固定サイズのウィンドウやコントロールに対して WYSIWYG 操作で編集する文には便利なんですが、今回は不要なので取っ払ってしまいましょう。</p>
+<p>とりあえず大枠で見た目を作ってしまいます。だいたい以下のようなコードになります。</p>
+<pre>
+&lt;UserControl x:Class="TimeInputSample.View.TimeInputControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"&gt;
+    &lt;UserControl.Resources&gt;
+        &lt;ResourceDictionary Source="CommonResources.xaml" /&gt;
+    &lt;/UserControl.Resources&gt;
+    &lt;Grid&gt;
+        &lt;Grid.Resources&gt;
+            &lt;Style x:Key="TimeInputTextBox" TargetType="TextBox" BasedOn="{StaticResource DigitTextBox}"&gt;
+                &lt;Setter Property="Background" Value="Transparent" /&gt;
+                &lt;Setter Property="BorderThickness" Value="0" /&gt;
+                &lt;Setter Property="Padding" Value="0" /&gt;
+                &lt;Setter Property="Width" Value="26" /&gt;
+                &lt;Setter Property="Height" Value="24" /&gt;
+                &lt;Setter Property="MaxLength" Value="2" /&gt;
+            &lt;/Style&gt;
+        &lt;/Grid.Resources&gt;
+        &lt;Grid.ColumnDefinitions&gt;
+            &lt;ColumnDefinition Width="Auto" /&gt;
+            &lt;ColumnDefinition Width="Auto" /&gt;
+            &lt;ColumnDefinition Width="Auto" /&gt;
+        &lt;/Grid.ColumnDefinitions&gt;
+        &lt;Label Background="White" BorderBrush="#555" BorderThickness="1,2,1,1" Grid.ColumnSpan="3" /&gt;
+        &lt;TextBox Text="{Binding Path=HourText}" Grid.Column="0" Style="{StaticResource TimeInputTextBox}" /&gt;
+        &lt;Label Content=":" Margin="4,0" Padding="0" Grid.Column="1" /&gt;
+        &lt;TextBox Text="{Binding Path=MinuteText}" Grid.Column="2" Style="{StaticResource TimeInputTextBox}" /&gt;
+    &lt;/Grid&gt;
+&lt;/UserControl&gt;
+</pre>
+<p>外枠の見た目は <code>Label</code> を使っています。 <code>Rectangle</code> だと <code>BorderThickness</code> が <code>double</code> 型で、上下左右同じ太さにしかできないからです。</p>
+<p>時、分を入力する 2つのテキストボックスは、枠を消し、背景色を透明にした上で、最大 2文字しか入力できないようにしてあります。こうした見た目などの補助的な属性はすべて Style として設定するようにしてみました。ちなみにベースになるスタイルはリソースディクショナリとして別ファイルで記述しています。</p>
+<p><code>Grid.ColumnDefinitions</code> は、グリッドの列を定義します。ここでグリッドの列を分け、配下のコントロール毎に添付属性を使って、配置する列番号を <code>Grid.Column</code> で指定したり、列をまたぐ数を <code>Grid.ColumnSpan</code> で指定したりすることができます。</p>
+<h4>ViewModel</h4>
+<p>あくまでコントロールとして作るので、 ViewModel とは言っても、最初から View に割り当てられているのではなく、そのコントロールを配下にもつコンテナとなるウィンドウやコントロールの制御ロジック上でバインドするデータとして使うことを想定します。</p>
+<p>表示上では数字以外の文字列を入力されたり、そも分は 0パディング表示しなければいけなかったりするので、時、分のテキストボックスにバインドするデータは <code>string</code> 型である必要があります。その一方で、制御ロジック上では時も分も <code>int</code> 値で扱えないと不便ですし、日付の <code>DateTime</code> に時刻を混ぜ合わせるような処理も欲しいところです。</p>
+<pre>
+    /// 時刻入力コントロール用のデータオブジェクトクラス。
+    public class TimeInputControlData : ViewModelBase
+    {
+        /// 時刻の時。
+        public int? Hour
+        {
+            // ...
+        }
+
+        /// 時刻の分。
+        public int? Minute
+        {
+            // ...
+        }
+
+        /// 時刻の時の文字列表現。
+        public string HourText
+        {
+            // ...
+        }
+
+        /// 時刻の分の文字列表現。
+        public string MinuteText
+        {
+            // ...
+        }
+
+        /// 入力済みチェック。
+        public bool HasValue
+        {
+            // ...
+        }
+
+        /// 日付に時刻を加えて日時に変換する。
+        public DateTime? BlendWithDate(DateTime? date)
+        {
+            // ...
+        }
+    }
+</pre>
+<p>必要になるアクセサ、メソッドはざっとこんなところでしょうか。</p>
+<p><code>ViewModelBase</code> というクラスを継承していますが、これは WPF で View にバインドするデータを制御ロジック込みのオブジェクトとして定義したい場合に実装すべき機能をまとめたものです。<a href="https://github.com/murachi/samples-for-blog/blob/master/wpf/TimeInputSample/TimeInputSample/ViewModel/ViewModelBase.cs" title="samples-for-blog/wpf/TimeInputSample/TimeInputSample/ViewModel/ViewModelBase.cs at master ・ murachi/samples-for-blog ・ GitHub">実装は至ってシンプル</a>で、単に <a href="http://msdn.microsoft.com/ja-jp/library/ms133020%28v=vs.100%29.aspx">System.ComponentModel.INotifyPropertyChanged</a> インタフェースを実装し、 View に関連づけられたプロパティの更新イベントを発生させるためのメソッド <code>NotifyPropertyChanged()</code> を用意しているだけです。</p>
+<h4>入力とバリデーション</h4>
+<p>時分の時の入力について考えてみましょう。ここで View に関連づけるプロパティは <code>HourText</code> の方ですが、制御ロジック側からのアクセスを考えると、 <code>int</code> 値として直接設定ができた方が何かとはかどりそうです。そこで、まずは <code>Hour</code> プロパティへの操作を実装してみます。</p>
+<pre>
+using System.Diagnostics;
+
+    public class TimeInputControlData : ViewModelBase
+    {
+        private int? hour_val;
+
+        public int? Hour
+        {
+            get { return hour_val; }
+            set
+            {
+                Debug.Assert(!value.HasValue || 0 &lt;= value &amp;&amp; value &lt; 24);
+                hour_val = value;
+                NotifyPropertyChanged("HourText");
+            }
+        }
+
+        // ...
+</pre>
+<p><code>Hour</code> プロパティに触れるのは制御ロジックだけで、ユーザー入力がここに直接入ってくるわけではない、というスタンスなので、ここでの Validation は単に Assertion としての扱いとなっています (さすがに手抜きに過ぎるかもですが…)。</p>
+<p>View に関連づけているのはあくまで <code>HourText</code> プロパティなので、 <code>NotifyPropertyChanged()</code> メソッドに渡す「表示を更新すべきプロパティの名前」も <code>Hour</code> ではなく <code>HourText</code> ということになります。</p>
+<p>ちなみに <code>Hour</code> プロパティも <code>hour_val</code> コンテナも、型は <code>int</code> ではなく <code>int?</code> 、すなわち <code>Nullable&lt;int&gt;</code> としています。これは、このコントロールが空欄の場合もあり得るためです。つまり、すでに存在する時刻入力コントロールに対して、制御ロジック側から表示を空欄にしたい場合は、以下のように書けばいい、ということになります。</p>
+<pre>
+    // 時刻入力コントロールにバインドするプロパティ
+    TimeInputControlData TimeInput { get; private set; }
+
+    // 時刻入力を空欄にする
+    private void ResetTime()
+    {
+        TimeInput.Hour = TimeInput.Minute = null;
+    }
+</pre>
+<p>さて、値の設定と表示への反映の仕組みはできあがったので、 <code>HourText</code> プロパティはこれを利用して実装することができます。ユーザー入力を扱わなければならない <code>HourText</code> の処理はこれよりやや複雑になります。</p>
+<pre>
+        public string HourText
+        {
+            get { return hour_val.HasValue ? hour_val.Value.ToString() : null; }
+            set
+            {
+                // 空欄にされた場合
+                if (value == null || value == "")
+                {
+                    Hour = null;
+                    return;
+                }
+                // 入力のバリデーション
+                int hour;
+                if (int.TryParse(value, out hour) &amp;&amp; 0 
+<p><code>HourText</code> の中では、値の設定で <code>hour_val</code> コンテナ直接代入するのではなく、 <code>Hour</code> プロパティに代入するようにしています。こうすることで、 <code>Hour</code> プロパティ側で <code>NotifyPropertyChanged()</code> メソッドを呼んでくれるので、 View の表示もしっかり更新されるというわけです。反面、ユーザーが数字以外の文字や、 99 などのあり得ない値を入力してきた場合、 <code>Hour</code> への代入は発生しません。この場合、変更されなかった <code>hour_val</code> コンテナがもつ元々の値で表示が更新されます。たとえば、元々 "3" が入っていたところに "33" と入力しても、フォーカスが離れた途端に "3" に戻ってくれるということです。</p>
+<p><code>Minute</code> と <code>MinuteText</code> もだいたい似たような感じで実装します。ここでは説明を割愛します。</p>
+<h4>フォーカスを受け取ったら全選択</h4>
+<p>データバインディング周りはこんなもんなので、あとは View のさらに細かい制御です。ここまでで、時刻の時を先に入力すると、分に勝手に「00」が入るようにしてあります。ここでさらに、時を入力した後に Tab キーでフォーカスを分に移すと分の「00」が全選択状態になるようにしてあると、分の書き換えも容易にできて便利かも知れません。</p>
+<p>そこで (ちゃんと仕様にも書いてますが)、時、分の入力欄はフォーカスを受け取ったら全選択するように実装してみることにします。</p>
+<p>この手の処理はさすがにコントロールのイベントに頼る必要があります。初めてのイベントドリブンプログラミングです。しかしそのためだけにコードビハインドを使うのはさすがにちょっとダサイです。そこで、 Expression SDK によってサポートされる Behavior や TriggerAction の利用を検討してみることにします。</p>
+</pre><ul>
+<li><a href="http://code.msdn.microsoft.com/windowsdesktop/Behavior-beae13a6">Behavior入門 言語: C# Visual Studio 2010 用</a></li>
+</ul>
+<p>今回は単にコントロールのイベントと View Model の Command を結びつけられれば十分なので、 TriggerAction を利用することにします。 Behavior や TriggerAction を利用するための準備については、上記サイトに詳しく書かれていますのでそちらを参照ください。要約するとこんな感じです。</p>
+<ol>
+<li>View および View Model があるプロジェクトの「参照設定」に、以下のアセンブリを追加する。
+<ul>
+<li>System.Windows.Interactivity</li>
+<li>Microsoft.Expression.Interactions</li>
+</ul>
+</li>
+<li>Behavior や TriggerAction を利用する UI の XAML ファイルにて、先頭のタグにおける名前空間の宣言部分に、以下の名前空間の宣言を書き加える。
+<pre>
+             xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
+             xmlns:ei="http://schemas.microsoft.com/expression/2010/interactions"
+</pre>
+</li>
+</ol>
+<p>次に XAML ファイルにて、時、分のテキストボックスに、 TriggerAction を追加します。ざっとこんな感じになります。</p>
+<pre>
+        &lt;TextBox Text="{Binding Path=HourText}" Grid.Column="0" Style="{StaticResource TimeInputTextBox}"&gt;
+            &lt;i:Interaction.Triggers&gt;
+                &lt;i:EventTrigger EventName="GotFocus"&gt;
+                    &lt;i:InvokeCommandAction Command="{Binding Path=GotFocusCommand}"
+                                           CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor,
+                        AncestorType=TextBox}}" /&gt;
+                &lt;/i:EventTrigger&gt;
+            &lt;/i:Interaction.Triggers&gt;
+        &lt;/TextBox&gt;
+        &lt;Label Content=":" Margin="4,0" Padding="0" Grid.Column="1" /&gt;
+        &lt;TextBox Text="{Binding Path=MinuteText}" Grid.Column="2" Style="{StaticResource TimeInputTextBox}"&gt;
+            &lt;i:Interaction.Triggers&gt;
+                &lt;i:EventTrigger EventName="GotFocus"&gt;
+                    &lt;i:InvokeCommandAction Command="{Binding Path=GotFocusCommand}"
+                                           CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor,
+                        AncestorType=TextBox}}" /&gt;
+                &lt;/i:EventTrigger&gt;
+            &lt;/i:Interaction.Triggers&gt;
+        &lt;/TextBox&gt;
+</pre>
+<p>これで、各テキストボックスの <code>GotFocus</code> イベントに、 <code>GotFocusCommand</code> という名前のコマンドを関連づけることができました。今回は <code>CommandParameter</code> の記述がポイントで、このバインディングでコマンドに渡されるパラメータは、まさにこの TriggerAction を設定しているテキストボックスオブジェクト自身です。</p>
+<p><code>GotFocusCommand</code> は、渡されるパラメータがテキストボックスオブジェクトである想定で実装します。まず、パラメータが本当にテキストボックスオブジェクトかどうかを実行可否の判断材料として記述し、</p>
+<pre>
+using System.Windows.Controls;  // 忘れずに。
+
+// ...
+
+        private bool CanGotFocus(object parameter)
+        {
+            return parameter is TextBox;
+        }
+</pre>
+<p>そして実行処理ではそのテキストボックスであるパラメータに対して全選択を行うメソッドの呼び出しを記述します。</p>
+<pre>
+        private void OnGotFocus(object parameter)
+        {
+            var target = parameter as TextBox;
+            target.SelectAll();
+        }
+</pre>
+<p>あとは、これらのメソッドをデリゲートとして設定したカスタムコマンドを <code>GotFocusCommand</code> コマンドとして定義してやれば完成です。</p>
+<pre>
+        private CustomCommand got_focus_command;
+
+        public CustomCommand GotFocusCommand
+        {
+            get
+            {
+                if (got_focus_command == null)
+                    got_focus_command = new CustomCommand(OnGotFocus, CanGotFocus);
+
+                return got_focus_command;
+            }
+        }
+</pre>
+<p><code>CustomCommand</code> ってなんじゃい、という突っ込みが聞こえそうですが <tt>(^^;</tt>、これは<a href="https://github.com/murachi/samples-for-blog/blob/master/wpf/TimeInputSample/TimeInputSample/ViewModel/CustomCommand.cs" title="samples-for-blog/wpf/TimeInputSample/TimeInputSample/ViewModel/CustomCommand.cs at master ・ murachi/samples-for-blog ・ GitHub">自前で実装したクラス</a>です。コマンド毎に <code>ICommand</code> インタフェースを実装したクラスを定義するのは激しく面倒なので、実際の実行処理と実行可否チェックはデリゲートとして渡せばいいようにした、というものです。</p>
+<p>ちなみに、フォーカスを受け取ったら全選択、みたいな処理はありふれているので、もっと再利用性の高い方法で部品化できた方がいいかもしれません。その場合は、添付 Behavior というテクニックを検討してみる価値があるかも知れません。</p>
+<ul>
+<li><a href="http://blogs.wankuma.com/kazuki/archive/2009/06/23/176379.aspx">[WPF][C#]テキストボックスをフォーカスがくると全選択状態にしたい - かずきのBlog</a></li>
+</ul>
+<p>なんかさっきから参考にしている情報のほとんどが同一人物によるものであるような気がしますが気にしないことにします <tt>(^_^;</tt> 。</p>
+<h3>日時入力コントロールの実装</h3>
+<p>せっかく時刻入力コントロールができたので、これに <code>DatePicker</code> を組み合わせただけのお手軽日時入力コントロールも作ってしまいましょう。</p>
+<h4>XAML</h4>
+<p>本当に <code>DatePicker</code> とさっきの時刻入力コントロールを並べるだけです。<a href="https://github.com/murachi/samples-for-blog/blob/master/wpf/TimeInputSample/TimeInputSample/View/DateTimeInputControl.xaml" title="samples-for-blog/wpf/TimeInputSample/TimeInputSample/View/DateTimeInputControl.xaml at master ・ murachi/samples-for-blog ・ GitHub">コード見た方が早い</a>でしょう。</p>
+<h4>View Model</h4>
+<p>時刻入力コントロールの部分のデータバインディングについては、時刻入力コントロール用の View Model オブジェクト <code>TimeInputControlData</code> オブジェクトをアクセサで渡すだけ渡してあげれば、あとは <code>TimeInputControlData</code> クラス内のメソッドがよしなにやってくれます。</p>
+<pre>
+        public TimeInputControlData Time { get; private set; }
+
+        public DateTimeInputControlData(DateTime? dt = null)
+        {
+            Time = new TimeInputControlData();  // コンストラクタの中でインスタンスをぶち込むのを忘れずに…
+            setDateTime(dt);
+        }
+</pre>
+<p>プログラム側からは、日付と時刻を別々に見るのではなく、日時を 1つの <code>DateTime</code> として参照できた方が便利に決まっています。ので、それ用のアクセサ <code>DateTimeValue</code> を実装します。</p>
+<pre>
+        public DateTime? DateTimeValue
+        {
+            get { return Time.BlendWithDate(date_val); }
+            set
+            {
+                setDateTime(value);
+                NotifyPropertyChanged("Date");
+                NotifyPropertyChanged("Time");
+            }
+        }
+</pre>
+<p>説明してませんでしたが、 <code>TimeInputControlData.BlendWithDate()</code> メソッドに、日付の <code>DateTime</code> に自身の時刻を混ぜ合わせた新しい <code>DateTime</code> を生成する処理を記述しています。</p>
+<p>特筆すべきはそのくらいかな…?</p>
+<h3>サンプルプログラム「日時メモ」</h3>
+<p>せっかくなので、今回作ったコントロールを用いた簡単なサンプルプログラムを作ってみましょう。記事冒頭ですでにキャプチャ画像を示しましたが、日時と文を書いて溜めていくだけの簡単なメモ的なものです。</p>
+<h4>Model - ローカルデータベース</h4>
+<p>まずは Model です。単体テストを構成しやすいように別プロジェクトにしたという構成の話は冒頭ですでに記述したとおりです。</p>
+<p>書き込んだメモは当然保存されることを想定しているので、保存する先としてファイルかデータベースを利用する必要があります。 .NET でもローカルデータベースは SQLight を使う方がメジャーになっているようですが (<a href="http://sqlite.phxsoftware.com/">System.Data.SQLight</a>)、一方 Visual Studio をインストールするときに一緒に入る Microsoft SQL Server にも、ローカルデータベース版の SQL Server Compact があり、追加でコンポーネントをインストールせずとも、そのままプロジェクトに組み込んで開発に利用することができます。</p>
+<ul>
+<li><a href="http://msdn.microsoft.com/ja-jp/library/cc645984%28v=sql.100%29.aspx">SQL Server Compact</a></li>
+<li><a href="http://msdn.microsoft.com/ja-jp/library/bb686876.aspx">テクニカル リファレンス (SQL Server Compact)</a></li>
+</ul>
+<p>ネット上での情報が少ない (といっても必要な情報は概ね MSDN にありますが…)、<a href="http://msdn.microsoft.com/ja-jp/library/aa983326%28v=vs.100%29.aspx" title="方法 : SQL Server Compact 3.5 データベースをアプリケーションと共に配置する">配置に難がある</a>等、使い勝手の面で SQLight に劣る部分も多いですが、 .NET を使うような仕事ともなると、フリーソフトウェアを製品に組み込みづらいケースも少なくないですし ('A`)、せっかくの機会なのでこっちを使ってみることにしました。</p>
+<p>ネット上にありがちな情報では、データグリッドに直接バインドしたりとか、エンティティモデルがどうのこうのとかやってたりして、単純に SQL 書いてデータ出し入れする方法がなかなか見つからなかったりするわけですが、実際のところ使い方は至って単純です。</p>
+<ol>
+<li>プロジェクトの参照設定に System.Data.SqlServerCe を追加する。 System.Data.SqlServerCe は .NET コンポーネントから選択できます。</li>
+<li>プロジェクトへの「新しい項目」の追加で、「ローカル データベース」を選んで追加します。ここで指定したファイル名が、ローカルデータベースの DB ファイル名になります。</li>
+<li>データベースエクスプローラにて、上記の DB ファイルのツリーを開き、配下の「テーブル」を右クリックして「テーブルの作成」を選びます。テーブル スキーマを編集するウィンドウが出てくるので、テーブル名やらテーブルレイアウトやらを設定します。必要になるテーブルの数だけこれを繰り返します。</li>
+<li>あとは、他の DBMS を使うのと同じように DB にアクセスするコードを書いていくだけです。 connection は <a href="http://msdn.microsoft.com/ja-jp/library/system.data.sqlserverce.sqlceconnection%28v=vs.100%29.aspx"><code>System.Data.SqlServerCe.SqlCeConnection</code> クラス</a>を使います。</li>
+</ol>
+<p>コードの書き方は<a href="https://github.com/murachi/samples-for-blog/blob/master/wpf/TimeInputSample/TimeInputModel/NoteBook.cs" title="samples-for-blog/wpf/TimeInputSample/TimeInputModel/NoteBook.cs at master ・ murachi/samples-for-blog ・ GitHub">実際のコードを見てもらう</a>のが一番手っ取り早いと思います…。</p>
+<h4>Unit Test</h4>
+<p>テストコードは <a href="http://www.nunit.org/">NUnit</a> を利用したものとなっています。ここではモデルに対する単体テストはこういう形でできるんだよねという確認程度で、テスト自体は大したことはやっていません。ビルドして吐き出される DLL を NUnit の GUI ツールに読み込ませることでテストが実行でき、テスト結果とコンソール出力が見られるようです。</p>
+<h3>今後の予定</h3>
+<p>今回は WPF や MVVM 自体が初めてと言うことで、全工程込みで書かせていただきました。無駄にボリュームのある記事になってしまった…。</p>
+<p>今後はポイントになる部分に絞った内容になっていくことになると思います。</p>
+<p><small>2013 年 3 月 1 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

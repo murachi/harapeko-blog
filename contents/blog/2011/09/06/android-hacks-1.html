@@ -1,0 +1,88 @@
+<h1>Android プログラミング(1) – 開発環境の設定まで</h1>
+
+<div class="entry">
+<p>スマートフォン向けアプリケーション事業に参入すべく、 Android SDK による開発について調査しています。</p>
+<ul>
+<li>
+<a href="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X">Android Hacks —プロが教えるテクニック &amp; ツール<br/>
+<img border="0" src="http://ws.assoc-amazon.jp/widgets/q?_encoding=UTF8&amp;Format=_SL160_&amp;ASIN=487311456X&amp;MarketPlace=JP&amp;ID=AsinImage&amp;WS=1&amp;tag=harapekoinc-22&amp;ServiceVersion=20070822"/></a>
+</li>
+</ul>
+<p>当ブログではシリーズとして、上記書籍を参考に学習しながら、気づいた点などについてメモを残していくことにします。</p>
+<p>今回は、開発環境の導入と設定までです。<br/>
+<span id="more-162"></span></p>
+<h3>「1章 Android 入門 Hacks」について</h3>
+<p>Android に関する簡単な紹介として、過去の歩み、 Android マーケット、 <a href="http://www.oesf.jp/">OESF</a> について触れています。それから日本語アプリをいくつか紹介。次に SDK のバージョンについて触れ、バージョン毎のシェアの推移がグラフでまとめられています。</p>
+<p>日本の会社が書いた書籍だけあって、日本の事情が加味された紹介になっていますが、予備知識としてもさらっと流しておけばよさげです…。お急ぎの方は読み飛ばしちゃってもいいかもしれません。</p>
+<p>OESF の認定資格とか、取りたがる人いるのかなぁ…。</p>
+<h3>開発環境の設定</h3>
+<p>というわけで、「2章 初級アプリケーション Hacks」からがいよいよ実践になります。先ずは開発環境の導入です。</p>
+<p>まず予備知識ですが、 Android SDK を用いて普通に開発するのであれば、開発言語は基本的には Java になります (フレームワークを使って JavaScript+HTML5 で開発とかも出来るらしいですが本書では多分触れられていません)。また、 IDE に Eclipse を (Google が配布している ADT プラグインとセットで) 使用することが推奨されているようです。</p>
+<p>つまり、導入すべき基本構成は以下の通りとなります (導入順)。</p>
+<ol>
+<li><a href="http://developer.android.com/sdk/index.html">Android SDK</a></li>
+<li><a href="http://www.oracle.com/technetwork/java/javase/downloads/index.html">JDK</a></li>
+<li><a href="http://www.eclipse.org/">Eclipse</a></li>
+<li>Android SDK の各種コンポーネント</li>
+<li>ADT (Android Development Tools) プラグイン</li>
+</ol>
+<p>以下、導入順にメモを残します。</p>
+<h4>1. Android SDK</h4>
+<p><a href="http://developer.android.com/sdk/index.html" title="Android SDK | Android Developers">ここ</a>にある書庫ファイルをダウンロードして、ローカルディスク上に展開します。場所はどこでもいいみたいですが、当面 Windows XP を使用する私はとりあえず <code>C:\</code> の直下に展開しました。</p>
+<h4>2. JDK</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+Windows で JDK 5、もしくは JDK 6 が入っていない場合はインストールしてください。これは Eclipse の動作に必要です。どちらも入っていない場合は JDK 6 をインストールしてください。
+</p></blockquote>
+<p>本書発行時には存在していなかった JDK 7 がリリースされていたので、それをインストールしちゃいました。後で動かしてみて駄目だったら入れ直します…。多分大丈夫だと思うんですけどね。</p>
+<h4>3. Eclipse</h4>
+<p>用途別なのか何なのか、<a href="http://www.eclipse.org/downloads/" title="Eclipse Downloads">とてつもなくいろんな種類のバージョンが存在</a>していて激しく戸惑うのですが、本書にはその中からどれを選べと言うことは特に書かれていません。多分ここはあんまり考えても仕方ないところだと思うので、素直に「Eclipse Classic 3.7」というのを選んでダウンロードし、インストールしました。 Eclipse 自体は優れた IDE なのだと思うので、他の用途でも試してみたいところなのですが (C++ とか C++ とか C++ とか)、その為のプラグインは後からでも必要に応じて入れてあげればいいでしょう。</p>
+<p>ちなみに、本書では以下のように書かれていますが、</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+Android SDK 2.2 リリース時点で Eclipse 3.4 か 3.5 を使うことができます。この章では Eclipse 3.5 で解説を進めます。
+</p></blockquote>
+<p>stable なバージョンを入れた方が後々いろいろとありがたいと思うので、あまり考えずに新しいのを入れればいいと思います。</p>
+<p># Linux ではまだ試してないのですが、まともなディストリビューションを使っていてパッケージ管理ツールから導入が出来るんであればその方がいいかもしれません。</p>
+<p>こちらも単に書庫ファイルを展開してあげればいいだけです。 Windows の場合は <code>%ProgramFiles%</code> の配下に入れてあげたくなるところですが、 Vista や 7 をお使いの方は十分注意してください。私は持って無いので試せません、あしからず… <tt>m(_ _)m</tt></p>
+<h4>4. Android SDK の各種コンポーネント</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<ol>
+<li type="1" value="1">
+コマンドラインから <code>&lt;SDK ルートディレクトリ&gt;/tools</code> にある <code>android</code> を起動、もしくは Eclipse で [Window] → [Android SDK and ADV Manager] を選択します。
+</li>
+</ol>
+</blockquote>
+<p>この「Eclipse で～」という説明は嘘です。なぜなら、この後にインストールする ADT プラグインが入っていなければこのメニューは出現しませんし、先に ADT プラグインだけをインストールしても、 Android SDK が見つからない、というようなエラーが出てきて何も出来ないからです。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<ol>
+<li type="1" value="1">
+<code>&lt;SDK ルートディレクトリ&gt;/SDK Setup.exe</code> を実行します。
+</li>
+</ol>
+</blockquote>
+<p>このプログラムのファイル名は、現在では <code>SDK Manager.exe</code> に変更されています。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+すべてのコンポーネントを選択してダウンロードすると非常に時間がかかります。
+</p></blockquote>
+<p>私はこの大切な 1行を見落としたまま、勢いすべてのコンポーネントをダウンロードしに行ってしまいました。他に用事があったのでその間に済めばと思ったのですが、半日潰れてしまう上に、途中で通信上の問題が発生したりするとハングアップ (動きが止まったまま先に進まない) してしまったりするので、お勧めしません…。</p>
+<p>開発ターゲットとなるプラットフォームのバージョンを選んで、それ用の Android コンポーネントと Google APIs コンポーネントを入れれば、とりあえずは十分っぽいです。サードパーティのコンポーネントについては、特に贔屓にするような事情があるわけでもないならば、後回しでよさげです。</p>
+<p># ちなみに、巷で出回っている Android 2.3 というのは、 2.3.1 と 2.3.3 のどちらなのでしょう…??</p>
+<h4>5. ADT プラグイン</h4>
+<p>概ね本書の説明通りでインストールできました。「Finish」ボタンを押した後、なにやら警告ダイアログが表示されましたが、「Continue」を押しておけば良さそうです。</p>
+<h3>プロジェクトを試しに作ってみる</h3>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<ol>
+<li type="1" value="3">
+図 3-2 のように各項目を設定します。
+</li>
+</ol>
+</blockquote>
+<p>馬鹿みたいにコンポーネントを全部入れてしまったおかげで、やたらと縦に長いダイアログになってしまいました <tt>(^_^;</tt> 。</p>
+<div class="wp-caption aligncenter" id="attachment_163" style="width: 510px"><img alt="新規プロジェクト作成時のダイアログ" class="size-full wp-image-163" height="1044" src="fig-20110906-new-android-project.png" title="新規プロジェクト作成時のダイアログ" width="500"/><p class="wp-caption-text">新規プロジェクト作成時のダイアログ</p></div>
+<p>ここで「Finish」を押すと、どうやらプロジェクトは作られるようなのですが、特に画面の表示は変化しません。 Eclipse は使い慣れていないので微妙に戸惑いましたが、 [Window] → [Open Perspective] → [Java Browsing] を選んであげれば、プロジェクトのソースファイルにアクセスできるようです。</p>
+<p>本日はここまで。</p>
+<p><small>2011 年 9 月 6 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

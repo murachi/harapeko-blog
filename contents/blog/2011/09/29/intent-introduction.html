@@ -1,0 +1,140 @@
+<h1>Android プログラミング(5) – インテント入門</h1>
+
+<div class="entry">
+<p>シリーズとして、下記の書籍にて学習したことについてのメモを綴っています。</p>
+<ul>
+<li>
+<a href="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X">Android Hacks —プロが教えるテクニック &amp; ツール<br/>
+<img border="0" src="http://ws.assoc-amazon.jp/widgets/q?_encoding=UTF8&amp;Format=_SL160_&amp;ASIN=487311456X&amp;MarketPlace=JP&amp;ID=AsinImage&amp;WS=1&amp;tag=harapekoinc-22&amp;ServiceVersion=20070822"/></a>
+</li>
+</ul>
+<p>今回は、「HACK#8 インテント入門」 (p.63～71) の内容について触れていきます。<br/>
+<span id="more-220"></span></p>
+<h3>インテントってなんぞや?</h3>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+<strong>インテント</strong>とはアクティビティやアプリケーション間でのやり取りを行うための仕組みです。インテントを利用することで自アプリケーション内の画面遷移だけでなく、他アプリケーションと連携を取ることができます。
+</p></blockquote>
+<p>前回までの学習においても、画面遷移の際に (つまり、他のアクティビティを呼び出す際に)、インテントを利用していました。 <code>startActivity()</code> メソッドに渡していたアレですね。</p>
+<pre>
+        button_to_branch.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(
+                        new Intent(RootActivity.this, BranchActivity.class) // &lt;- これ。
+                        );
+            }
+        });
+</pre>
+<p>「HACK#6 アクティビティ入門」においてこのようなコードが紹介された際には、この <code>Intent</code> クラスについては特に説明はありませんでした。</p>
+<p>本書で「明示的 INTENT」と呼んでいる方法では、 <a href="http://developer.android.com/reference/android/content/Intent.html#setClassName%28java.lang.String,%20java.lang.String%29"><code>setClassName()</code></a> メソッドを用いて、呼び出そうとするアクティビティのパッケージ名とクラス名を指定しますが、同名のメソッドには<a href="http://developer.android.com/reference/android/content/Intent.html#setClassName%28android.content.Context,%20java.lang.String%29">パッケージ名の代わりに <code>Context</code> オブジェクトを引数に取るもの</a>がオーバーロードされており (<a href="http://developer.android.com/reference/android/app/Activity.html"><code>Activity</code> クラス</a>はこの <code>Context</code> クラスを継承している)、上記のコンストラクタはまさにこの「明示的 INTENT」を実現する 1つの方法と言えるものなのでしょう。</p>
+<p>実際、<code>setClassName()</code> メソッドは <code>this</code> を返すので、上記のコードは以下のように書いても同様に動作することが確認できます。</p>
+<pre>
+            public void onClick(View v) {
+                startActivity((new Intent()).setClassName(RootActivity.this,
+                        "jp.co.harapeko.testsome.BranchActivity")); // &lt;- クラス名は省略できないっぽい…。
+            }
+</pre>
+<p>次に「暗黙的 INTENT」ですが、</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<pre>
+21:            Intent intent=new Intent();
+22:            intent.setAction(Intent.ACTION_VIEW);
+23:            intent.setData(uri)
+24:            startActivity(intent);
+</pre>
+</blockquote>
+<p><code>Intent</code> クラスには<a href="http://developer.android.com/reference/android/content/Intent.html#Intent%28java.lang.String,%20android.net.Uri%29">アクションと URI を指定するコンストラクタ</a>もあるので、この部分は以下のように書くこともできます。</p>
+<pre>
+            Intent intent=new Intent(Intent.ACTION_VIEW, uri);
+            startActivity(intent);
+</pre>
+<h3>インテントフィルタ</h3>
+<p>今度はインテントフィルタを用いて、暗黙的 INTENT を利用して起動するアクティビティを作る方法が解説されています。</p>
+<p>前回までの学習において、マニフェスト XML に、書くなと言われたり書けと言われたりしていた <code>&lt;intent-filter&gt;</code> 要素がここにきて登場します。</p>
+<pre>
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.VIEW" /&gt;
+                &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+                &lt;category android:name="android.intent.category.BROWSABLE" /&gt;
+                &lt;data android:scheme="http" /&gt;
+            &lt;/intent-filter&gt;
+</pre>
+<p><code>DEFAULT</code> カテゴリは要らんのかなと思ったのですが、消した状態でやってみたら暗黙的 INTENT で呼び出されなくなっちゃいました。<a href="http://developer.android.com/reference/android/content/Intent.html#CATEGORY_DEFAULT">ドキュメント</a>を見てもよくわからなかったのですが <tt>(^_^;</tt>、これがないとデフォルトでは暗黙的 INTENT における起動の対象にはならない、ということなのでしょうか。</p>
+<p>対応するスキーマを増やしたい場合は、 <code>&lt;data&gt;</code> 要素を単に増やせばよいようです。</p>
+<pre>
+                &lt;data android:scheme="http" /&gt;
+                &lt;data android:scheme="https" /&gt;
+                &lt;data android:scheme="ftp" /&gt;
+                &lt;data android:scheme="ftps" /&gt;
+</pre>
+<p>なお、起動される側のアクティビティにおける実装ですが、</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<pre>
+6:        if(!getIntent().getAction().equals(Intent.ACTION_MAIN)){
+7:            //暗黙的に起動された場合
+</pre>
+</blockquote>
+<p>ここは以下のように書いた方が良さそうです。</p>
+<pre>
+        if (Intent.ACTION_VIEW.equals(getIntent().getAction())) {
+            // 暗黙的に起動された場合
+</pre>
+<p><code>if</code> ブロック内の処理内容が VIEW アクションの時にのみ行われるべきものであるから、というのもあるのですが、なによりこのアクティビティが明示的 INTENT から起動した場合、 <code>getIntent().getAction()</code> が <code>null</code> を返すために、サンプルコードのままだと <code>java.lang.NullPointerException</code> 例外が送出されてしまうからです。</p>
+<h3>シェルの am コマンドでインテントをテスト</h3>
+<p>まとめると、</p>
+<ul>
+<li><q><code>am start -n </code>(パッケージ名)<code>/</code>(クラス名)</q> …明示的 INTENT</li>
+<li><q><code>am start -a </code>(アクション名)<code> -d </code>(URI) [<code> -t </code>(MIME タイプ)]</q> …暗黙的 INTENT</li>
+<li><q><code>am broadcast -a </code>(アクション名)</q> …BroadcastIntent
+</li></ul>
+<p>といった感じです。</p>
+<h3>BroadcastIntent</h3>
+<p>アクティビティ以外のクラスを作るのは何気に初めてなんじゃないでしょうか。 Eclipse にもまだあんまり慣れていないので、ここらで新規にクラスを追加する方法をおさらいしてみます。</p>
+<ol>
+<li>
+Package Explorer にて、プロジェクトツリーの「src/(パッケージ名)」を右クリックし、コンテキストメニューから「New &gt; Class」を選択する。<br/>
+<div class="wp-caption aligncenter" id="attachment_217" style="width: 410px"><a href="fig-20110929-create-new-class-01.png"><img alt="Eclipse でクラスの新規追加 - コンテキストメニュー" class="size-full wp-image-217" height="267" src="fig-20110929-create-new-class-01.png" title="Eclipse でクラスの新規追加 - コンテキストメニュー" width="400"/></a><p class="wp-caption-text">Eclipse でクラスの新規追加 - コンテキストメニュー</p></div>
+<ul>
+<li>プロジェクト名を右クリックして、でも良いのですが、パッケージ名を右クリックしていた場合、次の「New Java Class」ダイアログでパッケージ名を入力する手間が省けます。</li>
+</ul>
+</li>
+<li>
+「New Java Class」ダイアログにて、「Name」にクラス名、「Superclass」に継承する基底クラスの完全名称を入力する。<br/>
+<div class="wp-caption aligncenter" id="attachment_218" style="width: 410px"><a href="fig-20110929-create-new-class-02.png"><img alt="Eclipse でクラスの新規追加 - New Java Class ダイアログ" class="size-full wp-image-218" height="334" src="fig-20110929-create-new-class-02.png" title="Eclipse でクラスの新規追加 - New Java Class ダイアログ" width="400"/></a><p class="wp-caption-text">Eclipse でクラスの新規追加 - New Java Class ダイアログ</p></div>
+<ul>
+<li>今回の場合、基底クラスの名称は「<code>android.content.BroadcastReceiver</code>」ですね。</li>
+<li>基底クラスの完全名称がわからない場合はその横にある「Browse…」ボタンをクリックして表示される検索ダイアログを利用すると便利ですよ。</li>
+</ul>
+</li>
+<li>
+クラスのソースファイルが作成されます。オーバーライドが必要なメソッドが始めから用意され、必要な <code>import</code> 文もすべてあらかじめ書かれた状態で作られるので、便利です。<br/>
+<div class="wp-caption aligncenter" id="attachment_219" style="width: 410px"><a href="fig-20110929-create-new-class-03.png"><img alt="Eclipse でクラスの新規追加 - 追加されたソースファイル" class="size-full wp-image-219" height="341" src="fig-20110929-create-new-class-03.png" title="Eclipse でクラスの新規追加 - 追加されたソースファイル" width="400"/></a><p class="wp-caption-text">Eclipse でクラスの新規追加 - 追加されたソースファイル</p></div>
+</li>
+</ol>
+<h4>FLAG_ACTIVITY_NEW_TASK フラグ</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+基本的には今までと同じように <code>intent</code> を生成しますが、アクティビティ以外からアクティビティを起動する場合には 5 行目のように :</p>
+<pre>
+intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+</pre>
+<p>を記述する必要があります。
+</p></blockquote>
+<p>ここ、さらっと書かれていますが、何気に重要なんじゃないでしょうか。要チェックです。実際、この行無しでビルドして、 BroadcastIntent を発行してみると、以下のログメッセージを伴うような例外が送出されます。</p>
+<blockquote title="FLAG_ACTIVITY_NEW_TASK フラグをセットしなかった場合のエラーログ"><p>
+09-29 01:15:28.376: ERROR/AndroidRuntime(694): java.lang.RuntimeException: Unable to start receiver jp.co.harapekoinc.testintent.BootReceiver: android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TASK flag. Is this really what you want?
+</p></blockquote>
+<p>リファレンスにおける <a href="http://developer.android.com/reference/android/content/Context.html#startActivity%28android.content.Intent%29"><code>android.content.Context</code> クラスの <code>startActivity()</code> メソッド</a>の項にも以下のような記述があります。</p>
+<blockquote cite="http://developer.android.com/reference/android/content/Context.html#startActivity%28android.content.Intent%29" title="Context | Android Developers"><p>
+Note that if this method is being called from outside of an <code><a href="/reference/android/app/Activity.html">Activity</a></code> Context, then the Intent must include the <code><a href="/reference/android/content/Intent.html#FLAG_ACTIVITY_NEW_TASK">FLAG_ACTIVITY_NEW_TASK</a></code> launch flag.  This is because, without being started from an existing Activity, there is no existing task in which to place the new activity and thus it needs to be placed in its own separate task.
+</p></blockquote>
+<p><a href="http://developer.android.com/reference/android/content/Intent.html#FLAG_ACTIVITY_NEW_TASK"><code>Intent.FLAG_ACTIVITY_NEW_TASK</code> フラグ</a>の説明も見ておきましょう。 Back Stack というのがあって、このフラグを指定すると Back Stack に新しいタスクを積むよ、というようなことが書いてあります。 <a href="http://developer.android.com/guide/topics/fundamentals/tasks-and-back-stack.html" title="Tasks and Back Stack | Android Developers">Back Stack についてのドキュメント</a>も目を通しておくと良さそうです。</p>
+<h4>実際のシチュエーション</h4>
+<p><a href="http://developer.android.com/reference/android/content/Intent.html#ACTION_BOOT_COMPLETED" title="Intent | Android Developers"><code>BOOT_COMPLETED</code> アクション</a>はその名の通り、システム起動時に bloadcast されるアクションです。せっかくなので、システムを再起動して、ここで作ったアプリが自動的に起動するか試してみるといいと思います。エミュレータでやる場合、単にエミュレータを終了して起動し直してもシステムを再起動したことにはなりません。エミュレータの電源ボタンを長押しして、システムのシャットダウンを実行し、シャットダウン中の画面になるのを待ってから終了 (ここで待ち続けても多分終了しません…) し、再開する必要があります。</p>
+<h3>まとめ</h3>
+<p>そんなわけで今回は Android 公式のリファレンスも合わせて参照しながら進めてみました。学習の中で疑問点を見つけて公式情報に当たるというのはとても大切なことだと思います。</p>
+<p>暗黙的 INTENT や BloadcastIntent については若干気になる仕様だなと思いました。開発者サイドとしてはプログラムの実装の中で完全にコントロールできるのでやりやすいっちゃやりやすいのですが、ユーザーに自分で設定できる余地が与えられていないのが気になります。特に BloadcastIntent に関しては、それによって実行される処理がユーザーにとって鬱陶しいと思われるようなものでは恐らく敬遠されるでしょうから、慎重に実装する必要があるでしょうね。</p>
+<p><small>2011 年 9 月 29 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

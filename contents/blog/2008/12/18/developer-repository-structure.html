@@ -1,0 +1,172 @@
+<h1>開発環境構成検討中…。とりあえず Trac のインストールは完了。</h1>
+
+<div class="entry">
+<p>さて、 SSL は使える状態になったので、いよいよ Subversion のリポジトリ構築と Trac の導入、セットアップに入ります。</p>
+<h3>ファイル構成を検討する</h3>
+<p>が、その前に、今後もこのサーバーを開発用途に使い続けていくことを考え、使い始めからファイル構成には気を遣ってみようと思い、以下のような方針を出してみました。</p>
+<ul>
+<li>すべての開発関連ファイルは /var/Developer の配下に配置する。</li>
+<li>オリジナルの開発物と、外部から委託された案件とで全体を二分する。</li>
+<li>その中で、プロジェクト毎にディレクトリを設ける。</li>
+<li>プロジェクトのディレクトリ毎に、単独の svn リポジトリと trac リポジトリを設ける。</li>
+</ul>
+<p>これを例示すると、以下のようなファイル構成となります。</p>
+<pre>/var/Developer/
+  original/    # オリジナル用
+    foo/    # プロジェクト foo
+      svn/    # foo の svn リポジトリ
+      trac/    # foo の trac リポジトリ
+      .htdigest    # 内緒のプロジェクトの場合、 Trac にログオンするためのダイジェスト認証ファイル
+    bar/    # プロジェクト bar
+      svn/
+      trac/
+    baz/    # プロジェクト baz
+    # ...
+  trust/    # 外部から委託された案件用
+    hoge/    # プロジェクト hoge
+      svn/
+      trac/
+      .htdigest    # 委託案件は他人にみられちゃまずいので絶対必須
+    fuga/    # プロジェクト fuga
+    # ...</pre>
+<h3>Trac の導入</h3>
+<p>それでは Trac を導入しましょう。今回、以下のサイトを参考に、 Trac の導入を行いました。感謝!!<br/>
+<span id="more-11"></span></p>
+<ul>
+<li><a href="http://www.hanada.org/setting-up-trac-on-centos5">CentOS &amp; Trac | Hanada.Org</a></li>
+<li><a href="http://d.hatena.ne.jp/hurvinek/20080829/1220001650">Trac インストールに挑戦 – メモチョウ</a></li>
+</ul>
+<p>基本的には前者のサイトを参考にしました。後者は python-genshi が yum からは install できなかった点について参考にさせていただきました。</p>
+<p>やったことについては概ね以下の通りです。</p>
+<ol>
+<li>SELinux はそもそも使っていません。 iptables は使っていますが、 yum のポートはフィルタしていないのでここも設定不要でした。</li>
+<li>Subversion 用 WebDAV モジュールはインストールだけしましたが、秘匿する案件については利用予定はないので、Apache 側の設定まではしませんでした。</li>
+<li>今回は外部委託の案件なので、この案件のファイルにアクセスできる権限のためのグループを設けました。
+<pre>
+% sudo groupadd hoge
+% sudo vim /etc/group # グループにユーザーを追加する
+</pre>
+</li>
+<li>Subversion リポジトリを構築します。だいたい以下のような感じです。
+<pre>% su -
+% mkdir -p /var/Developer/trust/hoge/svn
+% cd /var/Developer/trust/hoge/svn
+% chown murachi.hoge .
+% chmod g+w .
+% chmod g+s .    # 配下のファイルのデフォルトグループ権限が統一される
+% exit    # root のままリポジトリ作ると import 時に問題が起こるので…
+% svnadmin create /var/Developer/trust/hoge/svn</pre>
+<p>そして手元の環境から、既に作り始めているファイルをディレクトリごと import します。 Linux 環境、あるいは Cygwin などを利用しているならば、以下の通り。</p>
+<pre>% svn import /path/to/hoge svn+ssh://murachi@onaka.harapeko.jp/var/Developer/trust/hoge/svn/trunk/hoge</pre>
+<p><q><code>trunk/hoge</code></q> がインポート先パスに追加されているのは、メイントランクのプロジェクト名にファイルを突っ込みたいから。 <a href="http://tortoisesvn.tigris.org/">TortoiseSVN</a> を使うのであれば、インポートするフォルダを選択して、上記と同様の URI を指定してあげれば ok 。別の場所に同様の URI でチェックアウトできることも確認しておきましょう。</p></li>
+<li>Trac をインストールします。<a href="http://www.hanada.org/setting-up-trac-on-centos5" title="CentOS &amp; Trac | Hanada.Org">先ほどのサイト</a>を参照して、 yum のリポジトリ追加を行ってからインストールを試みます。が、<a href="http://d.hatena.ne.jp/hurvinek/20080829/1220001650" title="Trac インストールに挑戦 - メモチョウ">python-genshi が無いよ、と怒られてしまいますので、これだけは rpm パッケージを拾ってきて手動でインストールする必要があります</a>。
+<pre>% sudo yum install python-setuptools    # python-genshi のインストールに必要でした。
+# 事前にディレクトリを参照して最新版のファイル名を確認しておきましょう。。。
+% wget http://packages.sw.be/python-genshi/python-genshi-0.5.1-2.el5.rf.i386.rpm
+% sudo rpm -i python-genshi-0.5.1-2.el5.rf.i386.rpm
+% sudo yum install trac</pre>
+<p>ここでインストールされる Trac は英語版なので、これは一旦削除し、代わりに<a href="http://www.i-act.co.jp/project/products/products.html" title="インタアクト株式会社--業務内容--公開資料">日本語版の Trac</a> をインストールします。</p>
+<pre>% sudo yum remove trac
+# これも事前に最新版のファイルの URI を確認しておきましょう。。。
+% wget http://www.i-act.co.jp/project/products/downloads/Trac-0.11.2.1.ja1.zip
+% unzip Trac-0.11.2.1.ja1.zip
+% cd trac-0.11.2.1.ja1
+% sudo python setup.py install</pre>
+</li>
+<li>trac リポジトリを構築します。<br/>
+普通に作ろうとすると DBMS に SQLite を使用するようになるのですが、今回は MySQL を使いたかったので、<a href="http://trac.edgewall.org/wiki/DatabaseBackend" title="DatabaseBackend ? The Trac Project">こちらのサイト</a>を参考に、データベースの構築から行います。ちなみに、 MySQL は既にインストールされていて、使える状態になっているものとします。
+<pre>% mysql -u root -p
+mysql&gt; create database trac_hoge;
+mysql&gt; grant all privileges on trac_hoge.* to trac_hoge@localhost identified by 'password';
+mysql&gt; use trac_hoge;
+mysql&gt; alter database default character set utf8 collate utf8_general_ci;
+mysql&gt; quit
+% su -
+% mkdir /var/Developer/trust/hoge/trac
+% cd /var/Developer/trust/hoge/trac
+% chown murachi.apache .    # apache から扱えるように。
+% chmod g+w .
+% chmod g+s .
+% exit
+% trac-admin /var/Developer/trust/hoge/trac/hoge initenv</pre>
+<p>そして、<q>database connection string</q> について聞かれたら、以下のように入力します。</p>
+<pre>mysql://trac_hoge:password@localhost/trac_hoge</pre>
+</li>
+<li>Apache に設定を追加します。弊社の環境ではヴァーチャルホスト設定によってサブドメインを追加しているので、そのディレクティブ内に設定を記述します。今回は秘匿する必要があり、 SSL を介して用いたいので、 <code>/etc/httpd/conf.d/ssl.conf</code> の中に設定を記述します。
+<p>その前に、ダイジェスト認証を用いたいので、まずはダイジェスト認証用のユーザー定義ファイルを作成します。</p>
+<pre>% htdigest -c /var/Developer/trust/hoge/.htdigest realm murachi</pre>
+<p>設定の記述内容は、概ね以下の通りです。</p>
+<pre>&lt;VertualHost&gt;
+
+# ...
+
+# trac location
+&lt;Location /trust/hoge/trac&gt;
+    SetHandler mod_python
+    PythonDebug On
+    PythonHandler trac.web.modpython_frontend
+    PythonOption TracEnvParentDir /var/Developer/trust/hoge/trac
+    PythonOption TracUriRoot /trust/hoge/trac
+&lt;/Location&gt;
+
+&lt;Location /trust/hoge&gt;
+    AuthType Digest
+    AuthName realm
+    AuthUserFile "/var/Developer/trust/hoge/.htdigest"
+    Require valid-user
+&lt;/Location&gt;
+
+&lt;/VirtualHost&gt;</pre>
+<p>Digest 認証の場合、 <code>AuthName</code> は <code>realm</code> で<strong>なければなりません</strong>。もっとも、 SSL で通信路自体が暗号化されているので、 Basic 認証でも問題なかったかも知れませんが…。</p>
+<p>それから、Digest 認証で <code>AuthUserFile</code> ステートメントを用いるのは Apache 2.2 以降で、 2.0 以前の場合は <code>AuthDigestFile</code> ステートメントを使用します。</p></li>
+<li>設定が文法上問題ないことを確認してから、 Apache を再起動します。
+<pre>% sudo /etc/init.d/httpd configtest
+% sudo /etc/init.d/httpd restart</pre>
+</li>
+</ol>
+<h3>URI がいまいち…</h3>
+<p>以上ですべての準備が整いました。ブラウザから、 https://developer.harapeko.jp/trust/hoge/trac に接続してみます。すると、以下のようなページが表示されました。</p>
+<p><a href="20081218-trac-humm.png"><img alt="" class="alignnone size-medium wp-image-12" height="233" src="20081218-trac-humm.png" width="300"/></a></p>
+<p>えっと…。どうやらここには Trac そのものではなく、 Trac のリポジトリを設定したプロジェクトの一覧が配置される模様。</p>
+<p>で、表示されているリンクをクリックすると Trac のトップページに遷移するのですが…</p>
+<p><a href="20081218-trac-what1.png"><img alt="" class="alignnone size-medium wp-image-14" height="233" src="20081218-trac-what1.png" width="300"/></a></p>
+<p>URI の中にプロジェクト名が 2つ重なって出てきてしまう。これは何ともイタダケナイ。</p>
+<h3>構成を再検討</h3>
+<p>そんなわけで、ファイルの構成を再検討中です。とりあえず、反省点としては以下の通りでしょうか。</p>
+<ul>
+<li>svn リポジトリと trac リポジトリは、やっぱり完全に分けた方がよさそう。そもそも、svn リポジトリは unix ユーザーで権限を制御しているのに対して、 trac は Web の認証で権限を制御するので、あんまり一緒に管理するメリットはない気がしてきた。</li>
+<li>trac リポジトリはオリジナル用と外注用の 2つに分けた上でプロジェクト毎に作成し、DB もプロジェクト毎に別個に作成する。アクセス制限はプロジェクトごとにロケーション別で設定可能だが、外注用についてはプロジェクト一覧ページには自分以外は入れないように制限する必要がある (オリジナルも同様に制限するかも…)。</li>
+<li>svn リポジトリはプロジェクトごとに別個に作成する。公開している Trac から svn リポジトリを覗いてみたら外注で開発しているソースが見えちゃったでござるの巻、なんてことがあってはならない。</li>
+</ul>
+<p>構成例としては以下のような感じでしょうか…。</p>
+<pre>/var/Developer/
+  svn/
+    original/
+      foo/
+      bar/
+      baz/
+      # ...
+    trust/
+      hoge/
+      fuga/
+      # ...
+  trac/
+    original/    # オリジナル用の TracEnvParentDir になる
+      foo/
+        .htdigest    # 認証用のユーザー定義ファイルはリポジトリの中に置いてしまう
+      bar/
+      baz/
+      # ...
+    trust/
+      hoge/
+        .htdigest
+      fuga/
+        .htdigest
+      # ...</pre>
+<p>という感じで軽くメモを書くだけのつもりが長々と書いてしまいました。これからまた設定です。おなか空いた…。</p>
+<p><small>2008 年 12 月 18 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

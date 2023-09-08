@@ -1,0 +1,113 @@
+<h1>C++11用のクラスひな形生成スクリプトを作ってみた</h1>
+
+<div class="entry">
+<p>C++ で開発する上で、クラスを一つ一つ実装するたびに毎回同じようなことを書かされるのは冗長なので、だいたいこんな感じになるよねという範囲のひな形を生成するスクリプトを perl で記述してみました。</p>
+<ul>
+<li><a href="https://github.com/murachi/samples-for-blog/tree/master/perl/cppgen">cppgen.pl</a></li>
+</ul>
+<p><a href="http://search.cpan.org/~asw/Getopt-Compact-0.04/lib/Getopt/Compact.pm">Getopt::Compact</a> モジュールを使用しています。ご利用の際にはそちらも合わせてインストールしてあげてください。<br/>
+<span id="more-357"></span><br/>
+ツールの特徴としては以下のとおりです。</p>
+<ul>
+<li>名前空間とクラス名を指定すると、それらから類推される名前でファイル名や include guard シンボル名を設定し、ひな形を生成する。これらの指定は必須。
+<ul>
+<li>名前空間は 1階層にしか対応してません…。</li>
+</ul>
+</li>
+<li>doxygen フォーマット (javadoc 風) でコメントを付加。
+<ul>
+<li>-s オプションでクラスの概要 (<code>@brief</code>) を指定可能。省略した場合はクラス名を使用。</li>
+</ul>
+</li>
+<li>クラスの public 継承、仮想クラス、インタフェースクラスに対応。</li>
+<li>Pimpl に対応 (構造体及びメンバ変数名は固定です…)。</li>
+<li>Boost.noncopyable に対応。</li>
+<li>コピーコンストラクタ、ムーブコンストラクタを自力実装するようにプレースホルダを設ける機能に対応。</li>
+</ul>
+<p>使い方ですが、例えば以下のようにすると、</p>
+<pre>
+$ perl cppgen.pl -c Observer -d hoge -s 'オブザーバーインタフェース' -in
+$ perl cppgen.pl -c Subject -d hoge -s 'サブジェクト抽象クラス' -vpn
+$ perl cppgen.pl -c ConsoleView -d hoge -s 'コンソールビュー抽象クラス' -e Subject -p
+$ perl cppgen.pl -c StaticText -d hoge -s 'コンソールに静的にテキストを表示するビュークラス' -e ConsoleView -p
+$ perl cppgen.pl -c DateTime -d hoge -s '日時を扱うクラス' -pCM
+$ perl cppgen.pl -c WatchController -d hoge -s '時計コントローラ' -e Observer -p
+$ perl cppgen.pl -c ConsoleManager -d hoge -s 'コンソール操作管理クラス' -pn
+$ ls
+console-manager.cpp  console-view.h  date-time.h      static-text.h  watch-controller.cpp
+console-manager.h    cppgen.pl       observer.h       subject.cpp    watch-controller.h
+console-view.cpp     date-time.cpp   static-text.cpp  subject.h
+</pre>
+<p>以下のような構成でファイルが生成されます。</p>
+<ul>
+<li>Observer クラス … noncopyable なインタフェースクラス (observer.h のみ)</li>
+<li>Subject クラス … Pimpl を持つ noncopyable な抽象クラス (subject.h, subject.cpp)</li>
+<li>ConsoleView クラス … Subject を継承し、 Pimpl を持つ抽象クラス (console-view.h, console-view.cpp)
+<ul>
+<li>他のクラスを継承するクラスは強制的に抽象クラスになります (デストラクタが virtual になる)。当たり前ですが…。</li>
+</ul>
+</li>
+<li>StaticText クラス … ConsoleView クラスを継承し、 Pimpl を持つ抽象クラス (static-text.h, static-text.cpp)</li>
+<li>DateTime クラス … Pimpl を持ち、コピーコンストラクタ、ムーブコンストラクタのプレースホルダを持つクラス (date-time.h, date-time.cpp)</li>
+<li>WatchController クラス … Observer クラスを継承し、 Pimpl を持つ抽象クラス (watch-controller.h, watch-controller.cpp)</li>
+<li>ConsoleManager クラス … Pimpl を持つ noncopyable なクラス (console-manager.h, console-manager.cpp)</li>
+</ul>
+<p>詳しくは <code>-h</code> オプションでヘルプを見るか、ソースを参照してください <tt>(^_^;</tt> 。</p>
+<hr/>
+2014/8/22 – <strong>追記</strong><br/>
+テンプレートクラスに対応しました。
+<pre>
+$ perl gencpp.pl -c DomNodeFromId -d hoge <strong style="color: red;">-t 'class NodeType'</strong> -ns 'ID を指定して DOM ノードを検索するラッパーオブジェクトクラス'
+</pre>
+<p>とかやると、以下の内容のヘッダファイル dom-node-from-id.h のみが生成されます。</p>
+<pre>
+/**
+    @file   dom-node-from-id.h
+    @brief  ID を指定して DOM ノードを検索するラッパーオブジェクトクラス定義  
+*/
+#ifndef HOGE_DOM_NODE_FROM_ID_H
+#define HOGE_DOM_NODE_FROM_ID_H
+
+
+namespace hoge {
+
+/**
+    @brief  ID を指定して DOM ノードを検索するラッパーオブジェクトクラス  
+*/
+template <strong style="color: red;">&lt;class NodeType&gt;</strong>
+class DomNodeFromId {
+    /// コピーコンストラクタ (使用禁止)
+    DomNodeFromId(DomNodeFromId const&amp;) = delete;
+    /// コピー代入演算子 (使用禁止)
+    DomNodeFromId &amp; operator=(DomNodeFromId const&amp;) = delete;
+    /// ムーブコンストラクタ (使用禁止)
+    DomNodeFromId(DomNodeFromId &amp;&amp;) = delete;
+    /// ムーブ代入演算子 (使用禁止)
+    DomNodeFromId &amp; operator=(DomNodeFromId &amp;&amp;) = delete;
+
+public:
+    /**
+        @brief  デフォルトコンストラクタ  
+    */
+    DomNodeFromId()
+    {
+        //TODO: デフォルト生成を行う処理の詳細をここに記述
+    }
+    /**
+        @brief  デストラクタ  
+    */
+    ~DomNodeFromId() = default;
+};
+
+}   //namespace hoge
+
+#endif  //HOGE_DOM_NODE_FROM_ID_H
+</pre>
+<p>見ての通り、 -n オプションと併用すると Boost.noncopyable を使用する代わりに、コピーやらムーブやらのあれこれを <code>= delete</code> しまくるコードが挿入されます。それから、デフォルトコンストラクタのプレースホルダはクラス定義内に確保され、デストラクタは <code>= default</code> で定義されます。</p>
+<p>この他、 -CM オプションあたりが併用可能となっていますが、抽象クラスになるようなオプション (-vie) や、 Pimpl モード (-p) との併用はできません。</p>
+<p><small>2014 年 8 月 20 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

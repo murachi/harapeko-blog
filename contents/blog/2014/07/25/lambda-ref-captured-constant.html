@@ -1,0 +1,41 @@
+<h1>C++: lambda の参照キャプチャは const 性を損なわない?</h1>
+
+<div class="entry">
+<p>C++ の勉強ということでちょいちょいスモールケースを書いては意味もなく github に commit するということをやっているのですが…</p>
+<ul>
+<li><a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/minimal-cases/value-modifier-lambda">samples-for-blog/c++/minimal-cases/value-modifier-lambda at master · murachi/samples-for-blog</a></li>
+</ul>
+<p>んー、何でしょうねこの雑なコード<tt>(^_^;A</tt> これ自体は確か、ステータスの変化を検知してステータスの種類にかかわらず共通の処理を自動で走らせるようにしたいんだけど、そうするとあれとこれとそれを変更しようとした時にあれを変更した時にもこれを変更した時にもそれを変更した時にも処理が重複して走っちゃうから無駄だよねってケースを想定して、じゃあ今あるステータスを全部一時的な構造体に突っ込んだものを引数にとってその構造体に変更を加えて返すコールバックを引数に取るようにすればいいんじゃね? って思ったんだけど、そんなの lambda で書きたいに決まってるけど変数キャプチャ付きの lambda は関数ポインタに変換できないじゃんねっていう訳で、コールバックに関数ポインタじゃなくて lambda を受け取る template メソッドにしてしまえ、ということを試してみたくて書いていたものでした (今考えたらそも<strong>素直に <code>std::function</code> 使えよ…</strong>って話ですねorz)。<br/>
+<span id="more-309"></span><br/>
+で、その試み自体は割とどうでもよくて、そういえば lambda の変数キャプチャで指定できるのはコピーか参照かのどっちかだけだけど、元々のキャプチャされる変数が <code>const</code> だった場合に、参照キャプチャしちゃった先の lambda の中で const 性が失われる (つまり、値の書き換えができちゃう) なんてことはないのかなぁ、というのがちょっと気になりました。</p>
+<blockquote cite="https://github.com/murachi/samples-for-blog/blob/master/c%2B%2B/minimal-cases/value-modifier-lambda/main.cpp" title="main.cpp より引用">
+<pre>
+struct A {
+    void func(minimum::Data &amp;data, std::string const&amp; birth, std::string const&amp; company)
+    {
+        data.modify([&amp;birth, &amp;company](minimum::Data::Detail detail){
+            detail.keys.erase(detail.keys.begin() + 1);
+            auto role = detail.values[1];
+            detail.values.erase(detail.values.begin() + 1);
+            detail.keys.push_back("birth");
+            // birth = "書き換えちゃった^-^";    //エラー
+            detail.values.push_back(birth);
+            detail.keys.push_back("company");
+            detail.values.push_back(company);
+            return detail;
+        });
+    }
+};
+</pre>
+</blockquote>
+<p>上記コードで <code>birth</code> は <code>std::string const&amp;</code> 型の引数として宣言されており、それを lambda で参照キャプチャし lambda 内で変更しようとすると、コンパイルエラーになる、ということが<strong>手元の GCC 4.8.2 では</strong>確認されました (-std=c++11)。</p>
+<p>…いや、ここで <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3337.pdf">N3337</a> でも参照して規格のこの部分の記述からしてそうなるのが正しいようですとか言い切れればカッコイイんですけど、少なくとも lambda について説明のあった 5.1.2節からはそんな記述を読み取ることはおいらには出来まへんでした… orz 。このへんもうちょっと読み慣れることができればいいんですけどね…。</p>
+<hr/>
+2014/7/25 21:46 – <strong>追記</strong>
+<p><a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/minimal-cases/value-modifier-function"><code>std::function</code> を使って改良</a>してみました。うわー、こっちのほうが全然スマートじゃないですかヤダー</p>
+<p><small>2014 年 7 月 25 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

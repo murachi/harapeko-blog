@@ -1,0 +1,166 @@
+<h1>Android プログラミング(3) – Activity 入門</h1>
+
+<div class="entry">
+<p>シリーズとして、下記の書籍にて学習したことについてのメモを綴っています。</p>
+<ul>
+<li>
+<a href="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X">Android Hacks —プロが教えるテクニック &amp; ツール<br/>
+<img border="0" src="http://ws.assoc-amazon.jp/widgets/q?_encoding=UTF8&amp;Format=_SL160_&amp;ASIN=487311456X&amp;MarketPlace=JP&amp;ID=AsinImage&amp;WS=1&amp;tag=harapekoinc-22&amp;ServiceVersion=20070822"/></a>
+</li>
+</ul>
+<p>今回は、「HACK#6 アクティビティ入門」 (p.41～58) の内容について触れていきます。<br/>
+<span id="more-177"></span><br/>
+いよいよプログラミングです! 張り切っていってみましょう。</p>
+<h3>アクティビティって何だ?</h3>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+<strong>アクティビティ</strong>とは、画面を持った機能の単位を指します。 Android では、アクティビティ毎に状態を管理する仕組みがあり、特殊な場合を除いて画面の遷移もアクティビティ単位で行います。
+</p></blockquote>
+<p>なるほど。モバイル機器向けの OS と割り切ってか、アプリが画面を占有することが前提の世界観になっているわけですね。 Windows でのアプリ開発がウィンドウ主体で行われたり、 Web アプリのクライアントスクリプト部分の開発が DOM 主体で行われたりするのとはまた対照的です。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+また、この Hack では本書のサンプルコードが利用できます。サンプルコードは <code>trunk/Hack6/HelloActivity</code> にあります。
+</p></blockquote>
+<p>こんな事が書いてありますが、この本、別に CD とかは付いてきません。いきなりこんなこと書かれちゃうと何の事やらさっぱりで混乱しちゃう読者とか結構いそうな気がするんですが… <tt>(^_^;)</tt></p>
+<p>で、その問題のサンプルコードですが、<a href="http://code.google.com/p/android-hacks/" title="android-hacks - Android Hacksのサンプルソースコード - Google Project Hosting">こちらのサイト</a>から入手可能なようです。 Subversion で checkout できるのはいいですね。 git でコピーして改造コードを独自に管理したりするとなお幸せかもしれません。</p>
+<p>…ですが、私はここは敢えてこのサンプルコードには手を出さず、本書に書かれたソースコードを手で入力しながら学習してみることにしました。写経は学習の基本です…多分。</p>
+<p>さて、それでは本書に習って Eclipse 上で新規プロジェクトを作ってみましょう… おっと、そうだった。新規プロジェクトは、すでに<a href="/blog/2011/09/06/android-hacks-1.html" title="はらぺこ日誌? ブログアーカイブ ? Android プログラミング(1) - 開発環境の設定まで">開発環境の設定の際にお試しで作っちゃっていました</a>。今回はこいつをそのまま利用することにします。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+アプリケーションを実行するには図 6-3 のようにプロジェクトツリーでプロジェクトのルートを選択した状態で、再生ボタンの形をしたアイコンをクリックします (Run メニューの Run を選択しても可)。
+</p></blockquote>
+<p>これ、プロジェクトツリー上での選択は必ずしも必須ではないみたいです…。もしかしたら複数のプロジェクトが存在するようなケースではここでの選択が意味のあるものになるのかもしれませんが、とりあえず何も選択しないままツールバーの再生アイコンをクリックしても全く問題なく起動します。</p>
+<p>むしろ、ここでエミュレータが初めて起動する際には、起動直後はエミュレータがロック状態になっていて、そのままではアプリが実行されないので、エミュレータ側でロックを解除してあげる必要があります。ロックを解除してしばらくすると、アプリが実行されるようです。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_178" style="width: 490px"><a href="fig-20110910-hello-world.png"><img alt="新規プロジェクト作成直後の実行画面" class="size-full wp-image-178" height="440" src="fig-20110910-hello-world.png" title="新規プロジェクト作成直後の実行画面" width="480"/></a><p class="wp-caption-text">新規プロジェクト作成直後の実行画面</p></div><br/>
+何も考えずにプロジェクト名を「TestSomething」として作ると、こんな内容の実行画面になります。 Activity の名前はプロジェクト作成時に指定可能…。
+<h4>static な文字列管理は strings.xml で</h4>
+<p>ところでこの画面に表示されている文字列、いったいどこに書かれているんでしょう? メインアクティビティクラス (私の場合、今回は <code>TestSomethingActivity.java</code>) のソース中にはこんな文字列は存在しませんでした。</p>
+<pre>
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+    }
+</pre>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+<code>setContentView</code> メソッドで指定している <code>R.layout.main</code> は、自動的に生成される XML の画面レイアウトリソースです。
+</p></blockquote>
+<p>なるほど。それでは <code>main.xml</code> の内容を覗いてみましょう…。</p>
+<pre>
+&lt;TextView  
+    android:layout_width="fill_parent" 
+    android:layout_height="wrap_content" 
+    <strong>android:text="@string/hello"</strong>
+    /&gt;
+</pre>
+<p><code>android:text</code> という属性名があからさまにアヤシイですね! <code>@</code> で始まるのは何かの識別子でしょうか? なんとなく、これは別のリソースを参照しているのではないかという気がします。</p>
+<p><code>@string</code> で始まっているので、 <code>string.xml</code> なんてファイルでもあるのかな? と Package Explorer の中を探ってみると… <code>res/values</code> の位置に、まさにそのものずばりのファイル <code>strings.xml</code> を見つけました!<br/>
+</p><div class="wp-caption aligncenter" id="attachment_179" style="width: 490px"><a href="fig-20110910-string-xml-1.png"><img alt="新規プロジェクト作成直後の string.xml" class="size-full wp-image-179" height="350" src="fig-20110910-string-xml-1.png" title="新規プロジェクト作成直後の strings.xml" width="480"/></a><p class="wp-caption-text">新規プロジェクト作成直後の strings.xml</p></div><br/>
+反転部分がまさに表示されていた文字列そのものですね。どうやら当たりのようです。早速書き換えて実行してみましょう!<br/>
+<div class="wp-caption aligncenter" id="attachment_181" style="width: 490px"><a href="fig-20110910-string-xml-2.png"><img alt="string.xml を弄ってみた" class="size-full wp-image-181" height="350" src="fig-20110910-string-xml-2.png" title="strings.xml を弄ってみた" width="480"/></a><p class="wp-caption-text">strings.xml を弄ってみた</p></div><br/>
+ここははらぺこらしく…ｗ
+<p>ちなみに画面の雰囲気が大分変わってますが、実はここを弄っていた当初、スクリーンショットを撮るのに失敗していたようで、その後、さんざん弄った (Eclipse のフォント設定含めて<tt>^_^;</tt>) 後になって慌てて撮り直したためです… <tt>m(_ _)m</tt></p>
+<p>実行すると、以下のように表示されました。日本語も化けていませんね。大成功です <tt>v(^-^)</tt> 。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_182" style="width: 490px"><a href="fig-20110910-harahetta.png"><img alt="strings.xml 変更後の実行画面" class="size-full wp-image-182" height="440" src="fig-20110910-harahetta.png" title="strings.xml 変更後の実行画面" width="480"/></a><p class="wp-caption-text">strings.xml 変更後の実行画面</p></div><br/>
+こうしてみると、なるほどどうやらアプリで使用する static な文字列は、この <code>strings.xml</code> ファイル内にリソースとして記述し、それを参照するように実装するのが良さそうです。決めうち定数をどのようにして一括管理するべきかというのは、開発においては結構重要なポイントですよ。
+<h3>アクティビティのライフサイクル</h3>
+<p>p.45～48 に渡って、アクティビティの生成、起動、中断、破棄などのライフサイクルと、それに応じて呼ばれるメッセージハンドラメソッドの説明、それらが呼ばれるタイミングを示した図が示されています。</p>
+<p>「図6-12 画面が回転した時」とあって、ここの意味がよく分からなかったので調べてみました。実は私は Android 端末はまだ入手していないのでピンと来なかったのですが… (<del>社費で中古の白ロムでも買おうかなぁ…</del>)、どうやら画面を縦横に傾けるとアプリの画面もそれに応じて向きが変わるようになっていて、そのことを言っているようです。画面回転時の再描画を実現するために、一旦アクティビティを破棄して生成し直す、ということをやっていて、その辺の一連のメッセージが全部飛んでくるから適切に対処しなきゃいけない、という話なのでした。</p>
+<h3>アクティビティの遷移</h3>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+画面遷移をするために他のアクティビティを起動させます。まずは起動するアクティビティを用意するために、 <code>MainActivity.java</code> をコピーして <code>SubActivity.java</code> を作成します。
+</p></blockquote>
+<p>これ、もうちょっと上手い方法は無いのでしょうか…? いろいろと実装してコード量が大きくなってしまったファイルをコピーして、不要なコードを削除して書き直す、というのはちょっと面倒です。かといって、単純にクラスを新規作成だと、 <code>extends</code> と、それに必要な <code>import</code> 行ぐらいは出力してくれるものの、それ以外のよく使うライブラリの <code>import</code> 行や <code>onCreate()</code> メソッドなどの冗長なコードを手作業で書き加える必要があるし、この後にまたコピペして作っているレイアウトリソースの XML ファイルも手作業で作らなきゃなりません。 XML ファイルのみを作成するウィザードは一応あるようですが、どうせならアクティビティ作成用のウィザードも ADT にて用意しておいていただきたいものです…。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<pre>
+10:    android:text="Sub activity"
+</pre>
+</blockquote>
+<p>もちろんここは、任意のテキストを指定できます。日本語でも問題ないようです。こんな感じで…ｗ</p>
+<pre>
+    android:text="飯でも食うか   ((( ´ω｀)=3"
+</pre>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+<code>main.xml</code> を以下のように修正します。 (ボタンの使い方は「Hack #9 ボタンを使う」で詳しく紹介しています。ここではおまじないだと思ってそのまま入力してください。)
+</p></blockquote>
+<p>私自身がそうなのですが、未知の技術を習得しようとする人が、講義の中で本論ではない未知の記述が出てきた時によく使われる「おまじない」という言葉に戸惑ってしまう、ということは少なくないようです。よく分からないものをよく分からないまま、ブラックボックスのままの状態で後回しにされるのが苦手なんですね。そんなわけで、 HACK#9 の該当部分を先回りして読んでみました。内容を要約すると概ね以下の通りです。</p>
+<ul>
+<li><code>android:id</code> 属性にボタン要素の ID を指定する。 <q><code>@+id/</code>(ID 名)</q> のように書くことによって、 <code>Java</code> コード中から <q><code>R.id.</code>(ID 名)</q> として参照することが出来るようになる。</li>
+<li><code>android:layout_width</code> 属性に <code>wrap_content</code> と指定すると、ボタンの表示幅かボタン内のラベル文字列にフィットするようになる。</li>
+<li><code>android:text</code> 属性にボタンのラベル文字列を設定する。</li>
+</ul>
+<p>ここでは特に ID の指定と利用の方法が重要ですね。この予備知識を元に、その後に出てくる Java のサンプルコードを読んでみると、より理解がスムーズに行くのではないかと思います。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+5～8行目の <code>View</code>、<code>Button</code>、<code>OnClickListener</code>、<code>Intent</code> クラスを使うために、 <code>import</code> 文を追加しています。
+</p></blockquote>
+<p><code>import</code> 行の行数がやたらと多くなってしまう辺りは如何にも Java という感じですね。クラス内クラスはグロブ (<q>(パッケージ)<code>.*</code></q> みたいな書き方) じゃ拾えないですしね。ていうか、クラス内クラスはむしろ名前空間に展開しないでコード中で <q><code>new View.OnClickListener()</code></q> みたいに書かせちゃった方が、むしろセマンティクス的にも閲覧性は上がるような気もします…。</p>
+<h4>DDMS って何? LogCat って何?</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+さらにアクティビティを追加したことを <code>AndroidManifest.xml</code> に追記してやる必要があります。追記せずに <code>SubActivity</code> を起動させるとエラーが出てしまいます (図 6-16)。
+</p></blockquote>
+<p>ほぅほぅ、それは是非とも試しておかなきゃですね! というわけで、<code>AndroidManifest.xml</code> を弄る前にとりあえず実行して、ボタンを押すとエラー画面がでてアプリが終了してしまうのを確認しました。</p>
+<p>で、ここまではよかったのですが、その直後。</p>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+DDMS のパースペクティブで LogCat のログを確認すると以下のようなエラーが赤い文字で出ているのがわかります。
+</p></blockquote>
+<p>さっぱりわかりません。 <strong>DDMS って何? LogCat ってどこで見れるの??</strong></p>
+<p>Web の時代に生きていることをこれほど感謝することはありませんね…。ぐぐればその答えはすぐに見つけることが出来ました。</p>
+<p>DDMS は Dalvik Debug Monitor Server の略で、 Android には標準で装備されているものらしいです。 ADT プラグインを入れた Eclipse 上では Android SDK アプリのデバッグの際に Android 端末やエミュレータ上の DDMS と通信してデバッグを実現しています。上記の引用では恐らくデバッガそのもののことを DDMS と呼んでいらっさるのでしょう。</p>
+<p>デバッガの話なのでデバッグ実行してあげる必要があるのですが、 Eclipse 上でツールバーの虫アイコンをクリックしてデバッグを開始しても、 LogCat とやらは表示されません。デバッグの状況をモニタするには、パースペクティブも Debug のものに切り替えてあげる必要があります。 Eclipse の画面右上の所にある「Debug」ボタンをクリックするか、または [Window] → [Open Perspective] → [Debug] メニューを選択すると、 Debug のパースペクティブに切り替えることができ、めでたく LogCat を拝むことができるようになります。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_183" style="width: 490px"><a href="fig-20110912-ddms-logcat-01.png"><img alt="DDMS のパースペクティブで LogCat を確認" class="size-full wp-image-183" height="350" src="fig-20110912-ddms-logcat-01.png" title="DDMS のパースペクティブで LogCat を確認" width="480"/></a><p class="wp-caption-text">DDMS のパースペクティブで LogCat を確認</p></div><br/>
+しかしこの画面ではログの全文に目を通すことができないので、コピペしてテキストエディタにでも貼りつけましょう。 LogCat にて (これ自体はログを一覧するマルチカラムのリストコントロールになっています)、コピーしたいログを選んで (複数選択できます) [Ctrl + C] キーを押すと、選んだログの全文がクリップボードにコピーされます。なんて直感的! ｗ<br/>
+<div class="wp-caption aligncenter" id="attachment_184" style="width: 490px"><a href="fig-20110912-ddms-logcat-02.png"><img alt="LogCat のログをテキストエディタにコピペしたところ" class="size-full wp-image-184" height="385" src="fig-20110912-ddms-logcat-02.png" title="LogCat のログをテキストエディタにコピペしたところ" width="480"/></a><p class="wp-caption-text">LogCat のログをテキストエディタにコピペしたところ</p></div><br/>
+これで、DDMS がはき出したエラーログの全文に目を通すことができるようになりました。うん。確かに、本書に書かれている通りのメッセージが出力されているようですね。
+<h4>マニフェストの追記</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール"><p>
+クラスだけを追加して <code>AndroidManifest.xml</code> への追記を忘れることはよくある (筆者だけ?) ので、
+</p></blockquote>
+<p>いえいえ、多分私もしょっちゅう忘れそうです。しかしリソース XML 然り、クラスの冗長な部分然り、アクティビティの作成に際してはあまりにも多くの部分が冗長な手作業になっていて悩ましいところですね。なんかその辺自動化できるようなプラグインって無いのかなぁ… 自作するか?</p>
+<h3>状態の保存、復元</h3>
+<p>本書ではここからサンプルコードが変わるのですが、やってる内容的に言ってもこれだけのためにまた一からプロジェクト作り直すのも面倒だったので、これまで使ってきたプロジェクトに、そのままここからの内容を付け足していくことにしてしまいました。</p>
+<p>で、思ったのですが、恐らくサンプルコードでは最初から用意してあるものの、本書では触れられていないためにひっそりとおまじない扱いにされている要素がいくつかあることに気づきました。やっぱり学習の基本は写経ですね! というわけでその辺について触れていきましょう。</p>
+<h4>追加すべき import 行</h4>
+<p>このサンプルプログラムではボタンの他にイメージビューと呼ばれるコントロールを利用しています。その為、以下の <code>import</code> 行を追加してあげる必要があります。</p>
+<pre>
+import android.widget.ImageView;
+</pre>
+<p>とはいえ、ボタンも同時に利用しているのですから、このように書くと、実際には以下のような記述になってしまうでしょう。</p>
+<pre>
+import android.widget.Button;
+import android.widget.ImageView;
+</pre>
+<p>実際の開発ではこの 2つに限らず、 <code>android.widget</code> パッケージに含まれるたくさんのコントロールを同時に使うことになるのではないでしょうか。といったことを考えても、この 2行を、グロブを用いて以下のように 1行にまとめて書くように習慣づけた方が何かと捗るような気がします。</p>
+<pre>
+import android.widget.*;
+</pre>
+<p>それからもう一つ、このサンプルプログラムでは、乱数を生成するオブジェクトのクラス <a href="http://download.oracle.com/javase/7/docs/api/java/util/Random.html"><code>Random</code></a> も利用していますので、以下の 1行も加えてあげる必要があります。これもまぁ、このパッケージの配下のクラスはいろいろと利用頻度高いんじゃないの? という配慮の元、グロブで書いちゃってますが、ここではふつーに完全修飾クラス名で書いちゃってもいいのかなとは思います。</p>
+<pre>
+import java.util.*;
+</pre>
+<h4>画像リソースを用意する</h4>
+<blockquote cite="http://www.amazon.co.jp/gp/product/487311456X/ref=as_li_ss_il?ie=UTF8&amp;tag=harapekoinc-22&amp;linkCode=as2&amp;camp=247&amp;creative=7399&amp;creativeASIN=487311456X" title="Android Hacks —プロが教えるテクニック &amp; ツール">
+<pre>
+05:    int[] images = new int[]{
+06:        R.drawable.android, R.drawable.stamp
+07:        , R.drawable.stamp2, R.drawable.mail};
+</pre>
+</blockquote>
+<p>Java なんだからカンマの手前で改行とかするなよみたいな野暮なことを言うつもりはないのですがｗ、この <q><code>R.drawable.</code>～</q> で始まる識別子、当然最初から用意されているわけもなく、この識別子によって参照されるリソースを自分で用意してあげる必要があります。</p>
+<p>そのリソースとはつまり画像のことです。適当な画像ファイルを 4つばっかし作成し、それぞれ然るべき名前で特定の場所に保存しておいてあげる必要があります。その手順を以下に示します。</p>
+<ol>
+<li>適当な画像を用意します。画像の形式は JPEG か PNG 辺りが確実でしょう。</li>
+<li>画像のファイル名を、先ほどの識別子 <q><code>R.drawable.</code>～</q> の <q>～</q> の部分と同じになるように変更します。例えば、 <code>R.drawable.android</code> に対応するファイル名は <code>android.jpg</code> とか <code>android.png</code> とかになります。</li>
+<li>画像ファイルを、 <code>(プロジェクトルート)/res/drawable-hdpi</code> ディレクトリ下にコピーします。</li>
+<li>Eclipse 上で [F5] キーを押し、 Package Explorer の表示を更新します。このとき、自動生成される <code>R.java</code> も更新され、先ほどの識別子が有効になります。</li>
+</ol>
+<h4>変数名を変えて入力してみよう</h4>
+<p>正直なところ、<code>mButton</code> とか <code>mImageView</code> とかみたいなハンガリアン記法的な名前規則がなんだか馬鹿みたいで私の性に合わないというのもあったので、メンバフィールドなどの変数名はもうちょっと意味のある名前に変えて入力していました。こうすることで、テキストに書かれているコードをただ書き写すのではなく、どの部分にどの変数を使うべきなのかと言うことをきっちり考えながら入力していくことになるので、理解も早くなるのではないかと思います。<br/>
+</p><div class="wp-caption aligncenter" id="attachment_185" style="width: 490px"><a href="fig-20110915-state-demo.png"><img alt="状態保存のサンプルプログラム実行画面" class="size-full wp-image-185" height="440" src="fig-20110915-state-demo.png" title="状態保存のサンプルプログラム実行画面" width="480"/></a><p class="wp-caption-text">状態保存のサンプルプログラム実行画面</p></div><br/>
+プロジェクトを作り直さずに機能を付け足すような形で実装したため、こんな画面になってしまいましたｗ　ちなみに、 [Ctrl + F12] キーで画面を横向きにすると、画像は画面の大きさに合わせて自動でリサイズされるようです (この辺の動作は <code>AndroidManifest.xml</code> で変更できるのかな?)。
+<h3>まとめ</h3>
+<p>まだ初歩の初歩だというのにやたらと内容がゴージャスになってしまいました… orz この辺は慣れてきた中盤以降の方がメモも簡潔になっていきそうな予感もありますね。</p>
+<p>ここまで文句ばかり書いていましたがｗ、実際にはかなり丁寧に説明が書かれていて、順を追って読みながら試していけば、すんなりと理解できるようになっているのではないかと思います。今後もこんな感じで学習を進めていきたいと思います。</p>
+<p>しかし新規アクティビティ作成用のプラグイン欲しいなぁ… あれだけは本当にいただけないよなぁ… 後でまた少し探してみよう…。</p>
+<p>今回は以上です。</p>
+<p><small>2011 年 9 月 15 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

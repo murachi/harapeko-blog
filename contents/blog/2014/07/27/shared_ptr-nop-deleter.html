@@ -1,0 +1,66 @@
+<h1>shared_ptr にヒープ以外のものを掴ませたいなら何もしない Deleter も一緒に指定してあげればいい</h1>
+
+<div class="entry">
+<p>これまた非常に初歩的な話なのですが…</p>
+<ul>
+<li>STL のコンテナ (<code>std::vector</code> とか) には基本的にオブジェクトへの参照を掴ませることはできない (領域確保の効率の問題とかでデフォルトコンストラクタが必須だから)。</li>
+<li>かといって、ナマポを掴ませるのは色々と危険 (意図せず寿命が切れて無効なポインタ掴まされた状態になったりとか)。</li>
+<li>そも non-copyable なオブジェクトを扱いたかったりと言った理由で値そのものを掴ませるのは却下したい (まぁ、いろいろあるんだよ…)。</li>
+<li>となると <code>std::shared_ptr</code> を噛ますのが順当かと思いきや…</li>
+<li>必ずしもヒープに確保した (つまり、 new した) インスタンスだけを扱うとは限らないかもしれない。十分に寿命が長いことがわかっている自動変数やメンバ変数として確保したインスタンスのポインタをこのコンテナに突っ込んであげたい場合もあるかもしれない。</li>
+<li>そういう場合に <code>std::shared_ptr</code> 使っちゃって大丈夫なのか…??</li>
+</ul>
+<p><span id="more-314"></span></p>
+<h3>Deleter を指定してあげれば大丈夫</h3>
+<ul>
+<li><a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/minimal-cases/shared-pointer-deleter">今回のサンプルコード</a></li>
+</ul>
+<p><code>std::shared_ptr</code> の Deleter って、 Win32 の <code>HANDLE</code> みたいに <code>delete</code> 以外の方法で開放するリソースを扱う方法として紹介されることが多いと思うんだけど、単純に、リソース開放の責任はここにはないよ、ということを明示する方法としてももちろん使えるよという、ただそれだけの話なんですね。</p>
+<pre>
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include &lt;iostream&gt;
+
+class Hoge {
+    int number;
+public:
+    explicit Hoge(int num) : number{num}
+    { std::cout &lt;&lt; "Hoge " &lt;&lt; number &lt;&lt; " constructed." &lt;&lt; std::endl; }
+    ~Hoge() { std::cout &lt;&lt; "Hoge " &lt;&lt; number &lt;&lt; " destructed." &lt;&lt; std::endl; }
+};
+
+int main()
+{
+    std::vector&lt;std::shared_ptr&lt;Hoge&gt;&gt; hogehoge;
+    hogehoge.push_back(std::shared_ptr&lt;Hoge&gt;{new Hoge(1)});    // まぁ普通…
+    Hoge fuga{2};
+    hogehoge.push_back(std::shared_ptr&lt;Hoge&gt;{&amp;fuga, [](Hoge *){}});    // を、行けるやん!!
+    Hoge piyo{3};
+    hogehoge.push_back(std::shared_ptr&lt;Hoge&gt;{&amp;piyo});    //(アカン)
+
+    return 0;
+}
+</pre>
+<p>実行結果:</p>
+<pre>
+murachi@erueru:~/github/samples-for-blog/c++/minimal-cases/shared-pointer-deleter$ g++ -std=c++11 -o hoge hoge.cpp
+murachi@erueru:~/github/samples-for-blog/c++/minimal-cases/shared-pointer-deleter$ ./hoge
+Hoge 1 constructed.
+Hoge 2 constructed.
+Hoge 3 constructed.
+Hoge 3 destructed.
+Hoge 2 destructed.
+Hoge 1 destructed.
+Hoge 3 destructed.
+*** Error in `./hoge': double free or corruption (out): 0x00007fff8a6192a0 ***
+中止 (コアダンプ)
+murachi@erueru:~/github/samples-for-blog/c++/minimal-cases/shared-pointer-deleter$ 
+</pre>
+<p>何もしない Deleter を指定しなかった場合、 <code>std::vector</code> が開放される際に <code>std::shared_ptr</code> が <code>delete</code> を呼ぼうとするんだけど、出自が自動変数だった当該インスタンスはスコープ抜けるときに vector より先に破棄されちゃっていたので、結果コアダンプしてしまうわけですが、 Deleter を指定してあげた方は <code>std::vector</code> 開放時には何もしないので、結果開放処理が重複することなく済むわけです。 Deleter が lambda で書けちゃうのもいいですね。</p>
+<p>ただ、この方法は<strong> <code>std::shared_ptr</code> でメモリー管理する領域よりも、生成元での寿命のほうが確実に長いことがわかっている場合以外は使えません</strong>。そういう意味では、プログラマーがメモリーの管理責任から開放されるための仕組みとして <code>std::shared_ptr</code> やガーベジコレクションのようなものを採用していることとは矛盾するやり方だと言えるでしょう。基本的には、 <code>std::shared_ptr</code> で扱うべきものは、プログラム全体で <code>std::shared_ptr</code> を介してのみ扱うよう徹底するのが正しいやり方なのかもしれません。</p>
+<p><small>2014 年 7 月 27 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

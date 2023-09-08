@@ -1,0 +1,58 @@
+<h1>Boost.Regex の ICU 拡張と char32_t は相性がいいかも?</h1>
+
+<div class="entry">
+<p>なんとなく Virtual Box から利用している Ubuntu のアップグレードなどをして、そこからなんとなく「やっぱり Long Time Release 版の Ubuntu もテスト環境に持っておきたいよなぁ」などと思いつつ Virtual Box ディスクイメージを追加でこさえて、 Boost ライブラリのセットアップなどもしつつ動作チェックも兼ねて<a href="/blog/2010/09/22/u32regex-bad-cast.html" title="はらぺこ日誌» ブログアーカイブ » char32_t だと regex が使えない">昔書いた記事</a>なんぞを掘り起こしておりましたら、そこに書かれた内容に関連して、そういえば Boost.Regex も ICU ライブラリと組み合わせれば Unicode に対応できたはずだよなぁなどということが気になりだしてしまいまして、いろいろ試しているうちに、以下のようなサンプルコードが問題なく動作してしまうことを発見してしまったのでメモしておこうかと思った次第なのであります。ああ、なんだかこちらのブログも口調が個人ブログや普段の Twitter とかでのそれに似てきてしまいました <tt>(^_^;A</tt> 。<br/>
+<span id="more-205"></span></p>
+<pre>
+#include &lt;string&gt;
+#include &lt;iostream&gt;
+#include &lt;boost/regex.hpp&gt;
+#include &lt;boost/regex/icu.hpp&gt;
+
+using namespace std;
+
+using boost::u32regex;
+using boost::u32match;
+
+int main()
+{
+        u32string text(U"C++0x のせかいへようこそ!!");
+        cout &lt;&lt; "pre-modified text length = " &lt;&lt; text.length() &lt;&lt; endl;
+        u32string modified;
+        u32regex reg(reinterpret_cast&lt;UChar32 const*&gt;(U"せかい"));
+        u32match match;
+        while (boost::regex_search(reinterpret_cast&lt;UChar32 const*&gt;(text.c_str()), match, reg)) {
+                modified += u32string(reinterpret_cast&lt;char32_t const*&gt;(match.prefix().str().c_str())) + U"世界";
+                text = reinterpret_cast&lt;char32_t const*&gt;(match.suffix().str().c_str());
+        }
+        modified += text;
+        cout &lt;&lt; "modified text length = " &lt;&lt; modified.length() &lt;&lt; endl;
+        return 0;
+}
+</pre>
+<p>とりあえず動作確認環境は以下の通りです。</p>
+<ul>
+<li>Ubuntu 11.04 + gcc 4.5.2 + Boost 1.42.0</li>
+<li>Ubuntu 10.04 LTS + gcc 4.4.3 + Boost 1.40.0</li>
+</ul>
+<p>どちらでもコンパイルコマンドは以下で通ります (ソースファイルを <code>u32test.cpp</code> として保存した場合)。</p>
+<pre>
+$ g++ -std=c++0x -o u32test u32test.cpp -lboost_regex
+</pre>
+<p>実行してみると、置換前と置換後の文字数が正しくカウントされており、マッチングが期待通りに動作していることが確認できます。</p>
+<pre>
+$ ./u32test
+pre-modified text length = 17
+modified text length = 16
+$ 
+</pre>
+<p>ただ、コードを見ていただければわかる通り、 <code>reinterpret_cast</code> の嵐であり、こうした書き方が C++0x 的にも Boost.Regex 的にも ICU 的にも Valid なのかはわかりません。また、現時点では Windows 環境 (MinGW + gcc 4.5 など) での動作確認は行っておりません。 ICU 拡張部分のヘッダを見る限り、内部で <code>wchar_t</code> を使っているので、 <code>wchar_t</code> が 16bits 境界になっている Windows では、バイトオーダーがひっくり返るなどの問題があって、もしかしたら正常に動かないかもしれません。</p>
+<p>あくまで参考までと言いますか、将来的にはこういう感じの書き方ができるようになると良いなぁと言う程度の妄想、と捉えていただければと思います… <tt>m(_ _)m</tt></p>
+<p>ちなみに、ここ最近ちっとも進んでいない otoco ですが、恐らく C++0x 自体の採用を見送る形になると思われます…。ただ、 Boost.Regex の ICU 拡張は有効利用できそうな気がしてきたので、こちらは利用することになるかもしれません。</p>
+<p>Google の <a href="http://code.google.com/p/re2/">re2</a> に流れてしまいそうな悪寒もしてますが…。</p>
+<p><small>2011 年 9 月 21 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

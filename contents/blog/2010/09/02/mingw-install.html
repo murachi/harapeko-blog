@@ -1,0 +1,30 @@
+<h1>MinGW のインストール方法がガラッと変わっていた (と思ったら元に戻っていた?) 件</h1>
+
+<div class="entry">
+<p>メインマシンではなくノートパソコンの方にも MinGW を入れていたはずなのですが、何故か <code>msys.bat</code> が消えていたりとなんだかいろいろと崩壊していたので、この際だからと最新の物をインストールすることにしました。</p>
+<p>ところが、MinGW の<a href="http://sourceforge.net/projects/mingw/files/" title="Browse MinGW - Minimalist GNU for Windows Files on SourceForge.net">ダウンロードサイト</a>にて「Download Now!」と書かれたリンクボタンをクリックすると、インストーラの exe ファイルではなく、何故か zip ファイルがダウンロードされ、展開すると謎のディレクトリ構成が…。<br/>
+<span id="more-123"></span><br/>
+試しに生成された <code>bin</code> ディレクトリ下の <code>mingw-get.exe</code> ファイルをダブルクリックしてみますが、一瞬コマンドプロンプトが表示されるだけで、何も行われません。こいつはいったい何なのか?</p>
+<p>ぐぐってみたところ、MinGW ポータルの <a href="http://www.mingw.org/wiki/Getting_Started">Getting Started</a> ページに行き当たりました。どうやら、上記で落としてきたファイルを <code>C:\MinGW</code> ディレクトリ下に展開し、 <code>C:\MinGW\bin</code> ディレクトリを環境変数 <code>PATH</code> に追加した上で、コマンドプロンプトから</p>
+<pre>
+mingw-get install パッケージ名 [パッケージ名 ...]
+</pre>
+<p>とタイプすれば、お好みのパッケージのみをダウンロードし、よしなにインストールしてくれる、という物なのでした。 <code>install</code> コマンドの他、<code>update</code> コマンドや <code>upgrade</code> コマンドも用意されているので、言わば <code>apt-get</code> の MinGW 版、といったところでしょうか。</p>
+<p>ただ、こいつを使ってインストールされる GCC が、 Getting Started のページでは 3.x 系であるとされていたのですが、実際には 4.5.0 がインストールされるようです (9/5 追記: すでにこの記述も 4.5 に修正されているようですね)。前回メインマシンに入れた GCC は 4.4.0 でしたが、 4.4.0 では <code>&lt;unorderd_map&gt;</code> を利用するコードをコンパイルするのに <code>-std=gnu++0x</code> オプションが必要であったのに対し、 4.5.0 では <code>-std=c++0x</code> オプションでもコンパイルできてしまったりと、早くも微妙な相違点を見つけてしまい、どっちで統一すべきか迷ってみたり…</p>
+<p>なお、 <code>mingw-get</code> コマンドが知らないオプションを渡そうとした場合 (例えば、<code>mingw-get install gcc</code> とタイプしようとして、誤って <code>mingw-get gcc</code> などとタイプしてしまった場合)、深刻なエラーとやらが発生し、何故か <code>mingw-get</code> コマンドを実行できない状態になってしまうようです。その場合は、<code>C:\MinGW\bin\mingw-get.exe~</code> ファイルを <code>mingw-get.exe</code> に、 <code>C:\MinGW\libexec\mingw-get\mingw-get-0.dll~</code> ファイルを <code>mingw-get-0.dll</code> に、それぞれリネームしてあげて下さい。それで再び使えるようになるはずです。</p>
+<p>それから、必要な追加ライブラリの類は、相変わらず手動でインストールした方が良さそうです。 libiconv をインストールしようとしたのですが、 mingw-get でインストールできるのは <code>msys-libiconv</code> というやつだけで、これだとどういう訳か MSYS 上ですらそのままではコンパイルできなかったりするので (コンパイル時にヘッダファイルのディレクトリとライブラリのディレクトリを指定し、実行時に DLL があるディレクトリのパスを通してやればよいのですが…面倒だし)。</p>
+<hr/>
+2010年  9月  5日 日曜日 17:29:19 JST – <strong>追記</strong>
+<p>今し方<a href="http://sourceforge.net/projects/mingw/files/" title="Browse MinGW - Minimalist GNU for Windows Files on SourceForge.net">ダウンロードサイト</a>を覗いてみたところ、 Inno Setup によるインストーラが復活しているようです。但し、以前までのインストーラとは若干毛色が違うようで、内部で mingw-get を利用する Web インストーラ的なものになっています。</p>
+<p>インストーラは mingw-get-inst という名前で、現在「Download Now!」ボタンはこのインストーラにリンクしています。インストール方法は、基本的にはインストーラの exe ファイルを実行し、ひたすら Next ボタンを押し続けるだけです。但し、インストールする構成を指定する画面で、インストールしたいコンポーネントをいくつか選ぶ必要があります。</p>
+<p>私の場合ですが、とりあえず C++ 言語は利用したいので、「C++ Compiler」にチェックを入れました。</p>
+<div class="wp-caption alignnone" id="attachment_126" style="width: 513px"><img alt="mingw-get-inst による MinGW セットアップ(1) - C++ 言語を利用する場合" class="size-full wp-image-126" height="385" src="mingw-get-inst-fig01.png" title="mingw-get-inst による MinGW セットアップ(1) - C++ 言語を利用する場合" width="503"/><p class="wp-caption-text">mingw-get-inst による MinGW セットアップ(1) - C++ 言語を利用する場合</p></div>
+<p>さらに、 MSYS も使いたいので、ツリーコントロールをスクロールし、一番下にある「MSYS Basic System」にもチェックを入れました。</p>
+<div class="wp-caption alignnone" id="attachment_127" style="width: 513px"><img alt="mingw-get-inst による MinGW セットアップ(2) - MSYS を利用する場合" class="size-full wp-image-127" height="385" src="mingw-get-inst-fig02.png" title="mingw-get-inst による MinGW セットアップ(2) - MSYS を利用する場合" width="503"/><p class="wp-caption-text">mingw-get-inst による MinGW セットアップ(2) - MSYS を利用する場合</p></div>
+<p>インストーラは mingw-get をインストールし、この mingw-get を利用して GCC や MSYS などのコンポーネントをダウンロードし、インストールしてくれるようです。ちなみに、コントロールパネルからアンインストールを行うと、 mingw-get のみが削除されるようで、 mingw-get によってインストールされたそれ以外のプログラムはそのまま残るようです。</p>
+<p><small>2010 年 9 月 2 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

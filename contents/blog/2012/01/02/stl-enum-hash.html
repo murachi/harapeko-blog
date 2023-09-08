@@ -1,0 +1,161 @@
+<h1>unorderd_map のキーに enum 型を使用する</h1>
+
+<div class="entry">
+<p>新年明けましておめでとうございます。去年はちっとも儲からなかったので、今年は本腰入れて開発やって自力で稼げる事業を立ち上げたく、その準備を進めて参る所存でございます。どうぞ生暖かく見守っていただければと思います…。</p>
+<p>さて、<a href="/blog/2011/12/27/cpp11-unicode.html">前回の記事</a>でお見せした、 iconv のラッパークラスをテンプレートクラスに作り直す際、 <code>&lt;unorderd_map&gt;</code> を利用していて気づいたことの備忘録です。</p>
+<ul>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.hpp?rev=16">EncodeString.hpp</a></li>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.cpp?rev=16">EncodeString.cpp</a></li>
+</ul>
+<p><span id="more-235"></span></p>
+<h3>問題</h3>
+<p>テンプレート引数に、内部文字列の (アラインメントを決定する) 物理型と文字セットを指定できるようにしたかったのですが、文字セットを示す文字列そのものをテンプレート引数に渡すことはできないので、代わりに文字セットを表す列挙値を定義し、対応する「文字セットを表す文字列」と関連づけた連想配列を <code>&lt;unorderd_map&gt;</code> を用いて用意する、ということをやってみることにしました。 C/C++ の列挙値は <code>int</code> にキャスト可能なので昔の自分だったら単純に「文字セットを表す文字列」の配列を用意して添え字代わりに列挙値を突っ込むところですが、メンテナンス性良くないですし、ハッシュテーブルなら検索コストは (ほぼ) 変わらないですからね。</p>
+<p>で、ヘッダファイルの方で列挙型を定義しーの、</p>
+<pre>
+enum charset_t {
+    chset_Utf8, chset_C99, chset_Java,
+    chset_Ucs2, chset_Ucs2Be, chset_Ucs2Le,
+    chset_Ucs4, chset_Ucs4Be, chset_Ucs4Le,
+    chset_Utf16, chset_Utf16Be, chset_Utf16Le,
+    chset_Utf32, chset_Utf32Be, chset_Utf32Le,
+    chset_Utf7,
+    chset_EucJp, chset_EucJis0213,
+    chset_Iso2022Jp, chset_Iso2022Jp2, chset_Iso2022Jp1, chset_Iso2022Jp3,
+    chset_ShiftJis, chset_Cp932, chset_ShiftJisX0213,
+};
+</pre>
+<p>テンプレート化しない実装部分のクラスに <code>static</code> で <code>const</code> な連想配列メンバを追加しーの、</p>
+<pre>
+class EncodeStringImpl
+{
+    typedef std::unordered_map&lt;charset_t, char const *&gt; cnmap_t;
+    static cnmap_t const CharsetNames;
+
+    // ...
+};
+</pre>
+<p>実装ファイルの方で連想配列の値を定義しーの、</p>
+<pre>
+EncodeStringImpl::cnmap_t const EncodeStringImpl::CharsetNames = {
+    { chset_Utf8, "UTF-8" }, { chset_C99, "C99" }, { chset_Java, "JAVA" },
+    { chset_Ucs2, "UCS-2" }, { chset_Ucs2Be, "UCS-2BE" }, { chset_Ucs2Le, "UCS-2LE" },
+    { chset_Ucs4, "UCS-4" }, { chset_Ucs4Be, "UCS-4BE" }, { chset_Ucs4Le, "UCS-4LE" },
+    { chset_Utf16, "UTF-16" }, { chset_Utf16Be, "UTF-16BE" }, { chset_Utf16Le, "UTF-16LE" },
+    { chset_Utf32, "UTF-32" }, { chset_Utf32Be, "UTF-32BE" }, { chset_Utf32Le, "UTF-32LE" },
+    { chset_Utf7, "UTF-7" },
+    { chset_EucJp, "EUC-JP" }, { chset_EucJis0213, "EUC-JISX0213" },
+    { chset_Iso2022Jp, "ISO-2022-JP" }, { chset_Iso2022Jp2, "ISO-2022-JP2" },
+    { chset_Iso2022Jp1, "ISO-2022-JP1" }, { chset_Iso2022Jp3, "ISO-2022-JP3" },
+    { chset_ShiftJis, "SHIFT_JIS" }, { chset_Cp932, "CP932" }, { chset_ShiftJisX0213, "SHIFT_JISX0213" },
+};
+</pre>
+<p>実際に使いーの、とやってみたはよいのですが、</p>
+<pre>
+void EncodeStringImpl::encode(void const *src, size_t src_length, size_t chr_size, charset_t from_charset,
+    charset_t to_charset)
+{
+
+    // ...
+
+    class auto_iconv_t {    // 生成時に iconv_open してスコープ抜ける時に iconv_close するプライベートクラス…
+        const iconv_t impl;
+    public:
+        auto_iconv_t(charset_t from_cs, charset_t to_cs) :
+            // ↓こことか
+            impl(iconv_open(CharsetNames.find(to_cs)-&gt;second, CharsetNames.find(from_cs)-&gt;second))
+        {
+            if (impl == reinterpret_cast&lt;iconv_t&gt;(-1)) {
+                // ↓こことか
+                throw EncodeStringException(string("LIBICONV initialize error: please check character set name \"") +
+                    CharsetNames.find(from_cs)-&gt;second + "\"(from) or \"" + CharsetNames.find(to_cs)-&gt;second +
+                    "\"(to)");
+            }
+        }
+        ~auto_iconv_t() { iconv_close(impl); }
+        iconv_t get() const { return impl; }
+    } iconv_handle(from_charset, to_charset);
+</pre>
+<p>いざ <code>g++</code> してみると、「<q><code>std::hash&lt;charset_t&gt;::operator()(charset_t) const</code></q> なんて定義されてねーよ」とリンカ様に怒られてしまいました。</p>
+<pre>
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ g++ -std=c++0x -o kumapan EncodeString.cpp kumapan.cpp 
+/tmp/ccIn30PX.o: In function `std::__detail::_Hash_code_base&lt;charset_t, std::pair&lt;charset_t const, char const*&gt;, std::_Select1st&lt;std::pair&lt;charset_t const, char const*&gt; &gt;, std::equal_to&lt;charset_t&gt;, std::hash&lt;charset_t&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_hash_code(charset_t const&amp;) const':
+EncodeString.cpp:(.text._ZNKSt8__detail15_Hash_code_baseI9charset_tSt4pairIKS1_PKcESt10_Select1stIS6_ESt8equal_toIS1_ESt4hashIS1_ENS_18_Mod_range_hashingENS_20_Default_ranged_hashELb0EE12_M_hash_codeERS3_[std::__detail::_Hash_code_base&lt;charset_t, std::pair&lt;charset_t const, char const*&gt;, std::_Select1st&lt;std::pair&lt;charset_t const, char const*&gt; &gt;, std::equal_to&lt;charset_t&gt;, std::hash&lt;charset_t&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_hash_code(charset_t const&amp;) const]+0x19): undefined reference to `std::hash&lt;charset_t&gt;::operator()(charset_t) const'
+/tmp/ccIn30PX.o: In function `std::__detail::_Hash_code_base&lt;charset_t, std::pair&lt;charset_t const, char const*&gt;, std::_Select1st&lt;std::pair&lt;charset_t const, char const*&gt; &gt;, std::equal_to&lt;charset_t&gt;, std::hash&lt;charset_t&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_bucket_index(std::__detail::_Hash_node&lt;std::pair&lt;charset_t const, char const*&gt;, false&gt; const*, unsigned int) const':
+EncodeString.cpp:(.text._ZNKSt8__detail15_Hash_code_baseI9charset_tSt4pairIKS1_PKcESt10_Select1stIS6_ESt8equal_toIS1_ESt4hashIS1_ENS_18_Mod_range_hashingENS_20_Default_ranged_hashELb0EE15_M_bucket_indexEPKNS_10_Hash_nodeIS6_Lb0EEEj[std::__detail::_Hash_code_base&lt;charset_t, std::pair&lt;charset_t const, char const*&gt;, std::_Select1st&lt;std::pair&lt;charset_t const, char const*&gt; &gt;, std::equal_to&lt;charset_t&gt;, std::hash&lt;charset_t&gt;, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, false&gt;::_M_bucket_index(std::__detail::_Hash_node&lt;std::pair&lt;charset_t const, char const*&gt;, false&gt; const*, unsigned int) const]+0x28): undefined reference to `std::hash&lt;charset_t&gt;::operator()(charset_t) const'
+collect2: ld はステータス 1 で終了しました
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ 
+</pre>
+<h3>解決策</h3>
+<p>ヘッダーファイルの方で、以下の記述を列挙型の定義のすぐ後辺りに追加してやることで、リンクも通るようになります。テンプレートの特殊化ってやつですね。</p>
+<pre>
+namespace std {
+template &lt;&gt;
+    inline size_t
+    hash&lt;charset_t&gt;::operator()(charset_t val) const
+{
+    return static_cast&lt;size_t&gt;(val);
+}
+}
+</pre>
+<h3>解説</h3>
+<p><code>std::hash</code> テンプレートクラスの実装は、 libstdc++ の場合、ヘッダファイルが置かれる然るべきディレクトリ配下の <code>bits/functional_hash.h</code> に記述されています。ここでは、非ポインタ型 <code>T</code> に対する <code>operator()</code> は (宣言はされているものの) 定義されていません。</p>
+<pre>
+  /// Primary class template hash.
+  template&lt;typename _Tp&gt;
+    struct hash : public __hash_base&lt;size_t, _Tp&gt;
+    {
+      size_t
+      operator()(_Tp __val) const;
+    };
+
+  /// Partial specializations for pointer types.
+  template&lt;typename _Tp&gt;
+    struct hash&lt;_Tp*&gt; : public __hash_base&lt;size_t, _Tp*&gt;
+    {
+      size_t
+      operator()(_Tp* __p) const
+      { return reinterpret_cast&lt;size_t&gt;(__p); }
+    };
+</pre>
+<p>で、この <code>operator()</code> の実装は、ごくごく基本的な組み込み型に対してのみ特殊化されています (ここは流石に長くなるので引用しませんが…)。</p>
+<p>こうした実装は C++11 の<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf" title="[PDF]JTC1.22.32 - ISO/IEC 14882 - Programming language C++ draft February 2011">ドラフト</a>にも明記されている標準の仕様に則ったものです。「20.8.12 Class template hash」に以下のような記述があります。</p>
+<blockquote cite="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf" title="[PDF]JTC1.22.32 - ISO/IEC 14882 - Programming language C++ draft February 2011">
+<ol>
+<li>The unordered associative containers defined in 23.5 use specializations of the class template hash as the default hash function. For all object types Key for which there exists a specialization hash&lt;Key&gt;, the instantiation hash&lt;Key&gt; shall:
+<ul>
+<li>satisfy the Hash requirements (17.6.3.4), with Key as the function call argument type, the DefaultConstructible requirements (Table 19), the CopyAssignable requirements (Table 23),</li>
+<li>be swappable (17.6.3.2) for lvalues,</li>
+<li>provide two nested types result_type and argument_type which shall be synonyms for size_t and Key, respectively,</li>
+<li>satisfy the requirement that if k1 == k2 is true, h(k1) == h(k2) is also true, where h is an object of type hash&lt;Key&gt; and k1 and k2 are objects of type Key.</li>
+</ul>
+<pre>
+template &lt;&gt; struct hash&lt;bool&gt;;
+template &lt;&gt; struct hash&lt;char&gt;;
+template &lt;&gt; struct hash&lt;signed char&gt;;
+template &lt;&gt; struct hash&lt;unsigned char&gt;;
+template &lt;&gt; struct hash&lt;char16_t&gt;;
+template &lt;&gt; struct hash&lt;char32_t&gt;;
+template &lt;&gt; struct hash&lt;wchar_t&gt;;
+template &lt;&gt; struct hash&lt;short&gt;;
+template &lt;&gt; struct hash&lt;unsigned short&gt;;
+template &lt;&gt; struct hash&lt;int&gt;;
+template &lt;&gt; struct hash&lt;unsigned int&gt;;
+template &lt;&gt; struct hash&lt;long&gt;;
+template &lt;&gt; struct hash&lt;unsigned long&gt;;
+template &lt;&gt; struct hash&lt;long long&gt;;
+template &lt;&gt; struct hash&lt;unsigned long long&gt;;
+template &lt;&gt; struct hash&lt;float&gt;;
+template &lt;&gt; struct hash&lt;double&gt;;
+template &lt;&gt; struct hash&lt;long double&gt;;
+template &lt;class T&gt; struct hash&lt;T*&gt;;
+</pre>
+</li>
+</ol>
+</blockquote>
+<p>そんな訳で、デフォルトで <code>std::hash</code> を利用する <code>std::unordered_map</code> を <code>enum</code> 型をキーにして使用したい場合には、その <code>enum</code> 型で <code>std::hash::operator()</code> を特殊化してあげる必要があるのです。</p>
+<p><small>2012 年 1 月 2 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

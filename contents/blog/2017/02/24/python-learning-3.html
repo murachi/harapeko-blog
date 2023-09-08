@@ -1,0 +1,104 @@
+<h1>Python習得中 – その3</h1>
+
+<div class="entry">
+<p>3章まで読了。データ構造を表す型が何気に豊富ですね…。</p>
+<p><span id="more-391"></span></p>
+<h3>リストをコピーする方法が 3通りもある</h3>
+<p>意外と自由度高いな…。</p>
+<pre>
+&gt;&gt;&gt; a = [1, 2, 3]
+&gt;&gt;&gt; b = a.copy()
+&gt;&gt;&gt; c = list(a)
+&gt;&gt;&gt; d = a[:]
+&gt;&gt;&gt; a[0] = 'hoge'
+&gt;&gt;&gt; a
+['hoge', 2, 3]
+&gt;&gt;&gt; b
+[1, 2, 3]
+&gt;&gt;&gt; c
+[1, 2, 3]
+&gt;&gt;&gt; d
+[1, 2, 3]
+</pre>
+<p>見た目だけなら <code>d</code> のやり方が一番好きだけど、パフォーマンス的にはどれが一番マシなんだろう…?</p>
+<p>ちなみに辞書のコピーは 3.4.12 節では <code>copy()</code> メソッドによる方法しか示されていなかったが、少なくとも <code>dict()</code> コンストラクタを使う方法は同様にイケるっぽい。</p>
+<h3>Python ではリストとタプルは別物である</h3>
+<p>Perl で慣れてるのでこういう表現になります。</p>
+<p>Perl では値をカンマで区切ったものは何でもリストになります。 Python では値をカンマで区切ったものはタプルとなり、要素の追加・削除・変更ができません。</p>
+<p>局面に応じて値の並びをミュータブルに扱いたいかイミュータブルに扱いたいかを選べるようになっているのは良いことだと思います。そうなっていることで不便を感じることも多分無いと思います。 Perl のリストの仕組みに不便を感じたことはありませんが。</p>
+<p>強いて言えば値 1個だけのタプルの書き方がちょっとキモイですね…。</p>
+<pre>
+&gt;&gt;&gt; (1)
+1
+&gt;&gt;&gt; 1,
+(1,)
+</pre>
+<p>Perl みたいに丸かっこで括ったらリスト、じゃないやタプルとして扱われる、でも良かった気もしますが…</p>
+<p>ただ、C++ や C# などでライブラリに存在するタプルオブジェクトなんかに比べれば、これが本来タプルに求められるべき使い勝手なんだろうな、という気はします…(´・ω・`)。</p>
+<h3><code>dict</code> コンストラクタ</h3>
+<p>2要素のタプルのタプルからでも生成できるみたいだけど、引数にタプルのリテラルを指定する場合はカッコをいっぱい挟まないといけない模様…(´・ω・`)</p>
+<pre>
+&gt;&gt;&gt; dict(1, 2, 3, 4, 5, 6)
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+TypeError: dict expected at most 1 arguments, got 6
+&gt;&gt;&gt; dict((1, 2), (3, 4), (5, 6))
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+TypeError: dict expected at most 1 arguments, got 3
+&gt;&gt;&gt; dict(((1, 2), (3, 4), (5, 6)))
+{1: 2, 3: 4, 5: 6}
+</pre>
+<p><code>dict</code> コンストラクタに指定できる引数の数が 1つだけなので、まぁ当然っちゃ当然ですが… 素直に <q><code>{</code> 〜 <code>}</code></q> 使えってことですね。</p>
+<h3><code>dict_keys</code> はそのまま <code>sorted</code> に渡せる</h3>
+<p>辞書の <code>keys()</code> メソッドは <code>dict_keys</code> オブジェクトを返す。リストとして扱うには <code>list()</code> コンストラクタに渡す必要があるが、ソートしたキーの一覧が必要な場合はそのまま <code>sorted()</code> 関数に渡せばいいっぽい。</p>
+<pre>
+&gt;&gt;&gt; da = { 'hoge': 'foo', 'fuga': 'bar', 'piyo': 'baz', 'piyopiyo': 'qux' }
+&gt;&gt;&gt; da.keys()
+dict_keys(['hoge', 'piyo', 'piyopiyo', 'fuga'])
+&gt;&gt;&gt; list(da.keys())
+['hoge', 'piyo', 'piyopiyo', 'fuga']
+&gt;&gt;&gt; sorted(da.keys())
+['fuga', 'hoge', 'piyo', 'piyopiyo']
+</pre>
+<h3>辞書のキーの集合を得るなら <code>keys()</code> メソッドの呼び出しも不要</h3>
+<p>これは 3.5.2 節に記載の通り。集合は <code>for</code> ループで回すこともできるので、普通の用途ならそもそもリストにする必要はないってことだやね。</p>
+<pre>
+&gt;&gt;&gt; da = {'hoge': 'foo', 'fuga': 'bar', 'piyo': 'baz', 'piyopiyo': 'qux'}
+&gt;&gt;&gt; set(da)
+{'hoge', 'piyopiyo', 'fuga', 'piyo'}
+&gt;&gt;&gt; for a in set(da):
+...     print(a)
+... 
+hoge
+piyopiyo
+fuga
+piyo
+</pre>
+<p>本当に <code>for</code> ループで回すだけなら <code>keys()</code> が返す <code>dict_keys</code> でもイケるようですが。</p>
+<pre>
+&gt;&gt;&gt; for a in da.keys():
+...     print(a)
+... 
+hoge
+piyo
+piyopiyo
+fuga
+</pre>
+<p>集合の使い勝手はむしろ集合同士の比較演算にあるようです。 (3.5.4 節)</p>
+<h3>辞書はキーにタプルが使える</h3>
+<p>タプルとそれ以外との混在も可能っぽい。</p>
+<pre>
+&gt;&gt;&gt; da = {'foo': 1, 'bar': 2, ('foo', 'bar'): 3, 'baz': 4, ('foo', 'baz'): 5}
+&gt;&gt;&gt; da
+{'bar': 2, 'baz': 4, ('foo', 'bar'): 3, 'foo': 1, ('foo', 'baz'): 5}
+&gt;&gt;&gt; da['foo', 'bar']
+3
+</pre>
+<p>DBMS でも 2つのカラムが PK になる場合とかありうるので、データ構造が無駄に複雑にならなくて済む場合もあってよさそう。</p>
+<p><small>2017 年 2 月 24 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

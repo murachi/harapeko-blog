@@ -1,0 +1,248 @@
+<h1>C++11 で Unicode プログラミングのススメ</h1>
+
+<div class="entry">
+<p>このエントリは、<a href="http://atnd.org/events/21936">C++11 Advent Calendar 2011</a> への参加記事です。</p>
+<p>初心者表明を免罪符にするつもりは毛頭無いのですが、 C++0x/11 の学習、およびそれを用いた経験はまだまだ浅いため、内容的に拙い部分が多々あることを、あらかじめご容赦願いたいと思います <tt>m(_ _)m</tt> 。ていうか突っ込みだいかんげいでつ。</p>
+<p>一応 <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf">ISO/IEC 14882:2011 の draft “n3242″</a> を参照しています。 GCC は 4.7 入れるの面倒だったので、動作確認できるものについては Ubuntu 11.10 に入っていた 4.6.1 を用いています。</p>
+<h3>Unicode に対応したリテラル</h3>
+<p>文字リテラルについてはドラフトの 2.14.3、文字列リテラルについては 2.14.5 に記述があります。<br/>
+<span id="more-229"></span><br/>
+文字リテラルには従来の</p>
+<pre>
+'a'
+L'あ'
+</pre>
+<p>といったスタイルに加えて、</p>
+<pre>
+u'\u00a9'   // コピーライト記号
+U'\U0002000b'  // 丈の右上に点がついた字
+</pre>
+<p>といったスタイルが追加されました。想定されるべき対応関係を表にすると以下の通りになります。</p>
+<table>
+<tr>
+<th>記述スタイル</th>
+<th>文字セット</th>
+<th>物理型</th>
+</tr>
+<tr>
+<td><code>'</code>…<code>'</code></td>
+<td>所謂 C 文字。<br/>マルチバイトの 1 オクテットでもいいし、まぁ、何でもあり。</td>
+<td><code>char</code></td>
+</tr>
+<tr>
+<td><code>l'</code>…<code>'</code> または <code>L'</code>…<code>'</code></td>
+<td>ユニバーサル文字セット (UCS)。</td>
+<td><code>wchar_t</code></td>
+</tr>
+<tr>
+<td><code>u'</code>…<code>'</code></td>
+<td>UTF-16</td>
+<td><code>char16_t</code></td>
+</tr>
+<tr>
+<td><code>U'</code>…<code>'</code></td>
+<td>UTF-32</td>
+<td><code>char32_t</code></td>
+</tr>
+</table>
+<p>文字列リテラルではさらに <code>u8</code> という接頭子も使えます。</p>
+<pre>
+u8"Copyright \u00a9 2011 Harapeko, Inc."    // \u00a9 は UTF-8 のオクテット列 [C2 A9] に変換される
+u"\U0002000bは「丈」の字にクリソツ"         // \U0002000b は UTF-16 の該当するサロゲートペアに変換される…ハズ
+</pre>
+<p>対応関係の表は、…面倒くさいからもういいか。</p>
+<p>あとさらっと流しちゃいましたが、 Unicode 用のエスケープ文字も追加されました。<q><code>\uNNNN</code></q> は 16bits の、 <q><code>\UNNNNNNNN</code></q> は 32bits の UCS を表現できます。上記の例のように、適切な文字列リテラル内で使用すれば、対応する文字セットの数値列に適宜変換されるはずです。この辺の説明はドラフトの 2.3 にありますが、以下の説明の通り、あくまで UCS の文字値を表現するものであって UTF の数値列を表現するものではないので、 <code>\uNNNN</code> の形式でサロゲートペアの上位代用符号位置に相当する値を指定することはできません。</p>
+<blockquote cite="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf" title="Working Draft, Standard for Programming&lt;br /&gt;
+Language C++ (N3242=11-0012)"><p>
+The character designated by the universal-character-name \UNNNNNNNN is that character whose character<br/>
+short name in ISO/IEC 10646 is NNNNNNNN; the character designated by the universal-character-name \uNNNN<br/>
+is that character whose character short name in ISO/IEC 10646 is 0000NNNN. If the hexadecimal value for a<br/>
+universal-character-name corresponds to a surrogate code point (in the range 0xD800.0xDFFF, inclusive),<br/>
+the program is ill-formed. Additionally, if the hexadecimal value for a universal-character-name outside the<br/>
+c-char-sequence, s-char-sequence, or r-char-sequence of a character or string literal corresponds to a control<br/>
+character (in either of the ranges 0×00.0x1F or 0x7F.0x9F, both inclusive) or to a character in the basic<br/>
+source character set, the program is ill-formed.15
+</p></blockquote>
+<h3>Unicode に対応した物理型</h3>
+<p>Unicode に対応した型については、ドラフトの 3.9.1 に説明があります。重要なのは多分以下の箇所。</p>
+<blockquote cite="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf" title="Working Draft, Standard for Programming&lt;br /&gt;
+Language C++ (N3242=11-0012)">
+<ol start="5">
+<li>Type wchar_t is a distinct type whose values can represent distinct codes for all members of the largest<br/>
+extended character set specified among the supported locales (22.3.1). Type wchar_t shall have the same<br/>
+size, signedness, and alignment requirements (3.11) as one of the other integral types, called its underlying<br/>
+type. Types char16_t and char32_t denote distinct types with the same size, signedness, and alignment as<br/>
+uint_least16_t and uint_least32_t, respectively, in &lt;stdint.h&gt;, called the underlying types.</li>
+</ol>
+</blockquote>
+<p>エーゴは苦手なんですが、ここを読む限り、<code>wchar_t</code> はサポートするロケールに含まれるもっとも大きな値の文字値を表現できるのに十分なサイズの整数型であることが補償されてなきゃいけなさそうに見えます。 <code>wchar_t</code> については<a href="/blog/2009/07/25/wchar_t-suck.html" title="はらぺこ日誌? ブログアーカイブ ? 頼りなさげな wchar_t">大分昔に見捨てている</a>んですが <tt>(^_^;</tt> 、VC++2010 だと 32bits 整数に変更されていたりするんでしょうか…?</p>
+<p># <a href="http://msdn.microsoft.com/ja-jp/library/s3f49ktz.aspx" title="Data Type Ranges (MSDN)">この辺</a>とか見る限り、やっぱり <code>unsigned short int</code> 相当、のままみたいですね… orz</p>
+<p><code>char16_t</code> と <code>char32_t</code> は、それぞれ UTF-16、 UTF-32 を扱うための型と考えて差し支えなさそうです。</p>
+<h3>「内部文字」のポリシー</h3>
+<p>型についての想定を考えるならば、プログラムが内部で扱う文字データは、 C++11 では <code>wchar_t</code> を使用するべきであるように思われます。将来的にはそうなってゆくべきなのでしょう。しかし過去との互換性などの観点から、各ベンダーの <code>wchar_t</code> に対する取り扱いは当面現状維持か、もしくは段階的な仕様変更 (コンパイラオプションでの切り替え等) となっていくことが予想されます。</p>
+<p>それに対し、 UTF-32 に関して言えば、恐らく向こう十何年かぐらいは「1要素 = UCS 1文字」であり続けるのではないかと思われます。従って、内部文字への要件として「1文字を 1つの数値のみで扱いたい」というのがあるのであれば、当面は <code>char32_t</code> と <code>U"</code>…<code>"</code> 形式のリテラルを用いるのが良さそうです。</p>
+<table>
+<tr>
+<th>要件</th>
+<th>選択すべき型と文字セット</th>
+</tr>
+<tr>
+<td>
+<ul>
+<li>1文字を 1つの数値のみで扱いたい</li>
+<li>メモリー使用量は気にしないか、32bits 幅でも十分管理可能</li>
+</ul>
+</td>
+<td><code>char32_t</code>、 UTF-32</td>
+</tr>
+<tr>
+<td>
+<ul>
+<li><code>&lt;</code>(<code>boost/</code>)<code>regex&gt;</code> を使いたい (後述)</li>
+<li>UTF-8 のクセに精通しているのでマルチバイトでも気にならない</li>
+<li>メモリー使用量を極力抑えたい</li>
+</ul>
+</td>
+<td><code>char</code>、 UTF-8</td>
+</tr>
+<tr>
+<td>
+<ul>
+<li>とにかく <code>wchar_t</code> を使い慣れている</li>
+<li>数十年後の未来との互換性、汎用性に賭けたい</li>
+</ul>
+</td>
+<td><code>wchar_t</code>、 UCS</td>
+</tr>
+</table>
+<h3>char32_t で文字列置換を試してみる</h3>
+<p>そんなわけで、実際に UTF-32 を内部文字の文字セットとして採用したプログラム例を作ってみることにしました。内容的には、静的に用意した文字列内のすべての「くま」を「ぱんだ」に置き換える、という簡単なものです。</p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &lt;string&gt;
+
+using namespace std;
+
+int main()
+{
+    u32string before = U"てくまくまやこんてくまくまやこん むらやましゃちょうよ おおきなくまにな～ぁれ";
+    u32string after;
+    u32string kuma = U"くま";
+    u32string panda = U"ぱんだ";
+
+    auto start_it = before.begin();
+    auto find_it = start_it + (kuma.size() - 1);
+    while (find_it &lt; before.end()) {
+        int cnt = 0;
+        auto stop_it = find_if(kuma.rbegin(), kuma.rend(), [&amp;cnt, find_it](char32_t letter) {
+            return *(find_it - cnt++) != letter;
+        });
+        if (stop_it != kuma.rend()) {
+            find_it += cnt;
+            continue;
+        }
+        // くまを発見、ぱんだに変身!!
+        after.append(start_it, find_it - (kuma.size() - 1));
+        after += panda;
+        start_it = find_it + 1;
+        find_it = start_it + (kuma.size() - 1);
+    }
+    after.append(start_it, find_it);
+
+    cout &lt;&lt; "before: " &lt;&lt; before.size() &lt;&lt; endl;
+    cout &lt;&lt; "after: " &lt;&lt; after.size() &lt;&lt; endl;
+
+    return 0;
+}
+</pre>
+<p>えっと… アルゴリズムの説明とかはいいですよね? 文字列の先頭からと検索語の後からで評価して、完全一致しなかった場合は一致した数値の数だけ読み飛ばして、を繰り返すというオーソドックスなやり方です。これだったらかっこつけて <code>find_if</code> とか使わんで <code>for</code> で回しても大して変わらんやんとかそういう突っ込みはさておき <tt>(^_^;</tt> 。</p>
+<p>GCC4.6/Ubuntu での実行結果は以下の通り。</p>
+<pre>
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ g++ -std=c++0x -o kumapan-n kumapan-n.cpp 
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ ./kumapan-n
+before: 39
+after: 44
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ 
+</pre>
+<p>実行結果として置換前後の <code>u32string::size()</code> を表示しています。 5つある「くま」が「ぱんだ」に置き換えられたので、その数が 5 増えています。増える筈の文字数と一致するので、正しく動作しているように見えます。</p>
+<h3>iconv を使って実際に出力してみる</h3>
+<p>さて、実際の文字列を出力してみたいのですが、このままだとロケールが UTF-8 で動作している端末上では表示できません。ファイルに出力してテキストエディタで、という手もありますが、せっかくなので libiconv を使って指定した文字セットに変換して出力、ということをやってみることにしましょう。</p>
+<p>libiconv の利用に際しては、お手製のラッパークラスを作成することで対応しました。作成したソースコードを以下にリンクします。</p>
+<ul>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.hpp?rev=16">EncodeString.hpp</a></li>
+<li><a href="http://developer.harapeko.jp/trac/original/otoco/browser/trunk/sample/EncodeString.cpp?rev=16">EncodeString.cpp</a></li>
+</ul>
+<p>このクラスは<a href="/blog/2010/09/22/utf-8-is-nice.html" title="はらぺこ日誌? ブログアーカイブ ? UTF-8 もイマイチだが…">過去の記事</a>においても使用しておりますが、 C++11 の勉強も兼ねて (?)、内部文字に使用する物理型と文字セットをテンプレートパラメータに指定できるテンプレートクラスに書き換えています (あ、過去の記事でのソースへのリンク先が最新版になっちゃってる…直さなきゃ…)。</p>
+<p>そして先ほどのサンプルプログラムは、最初の方で <code>EncodeString.hpp</code> を <code>#include</code> し、</p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &lt;string&gt;
+
+#include "EncodeString.hpp" // ←
+
+using namespace std;
+</pre>
+<p>最後の方で出力内容を以下のように修正します。</p>
+<pre>
+    cout &lt;&lt; "before: " &lt;&lt; EncodeString&lt;char32_t, chset_Utf32&gt;(before, chset_Utf8).getCharArray() &lt;&lt; endl;
+    cout &lt;&lt; "after: " &lt;&lt; EncodeString&lt;char32_t, chset_Utf32&gt;(after, chset_Utf8).getCharArray() &lt;&lt; endl;
+</pre>
+<p>Windows 環境とかで Shift JIS (CP-932) で出力したい人は、 <code>chset_Utf8</code> を <code>chset_Cp932</code> に置き換えてあげれば ok です。GCC4.6/Ubuntu での実行結果は以下の通り。</p>
+<pre>
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ g++ -std=c++0x -o kumapan EncodeString.cpp kumapan.cpp 
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ ./kumapan
+before: てくまくまやこんてくまくまやこん むらやましゃちょうよ おおきなくまにな～ぁれ
+after: てぱんだぱんだやこんてぱんだぱんだやこん むらやましゃちょうよ おおきなぱんだにな～ぁれ
+murachi@ubuntu-vbox:~/otoco/trunk/sample$ 
+</pre>
+<p>環境によっては libiconv を別途導入してコンパイルオプションに <code>-liconv</code> を付け加える必要があるかもしれません (MinGW とか←動作未確認)。</p>
+<h3>正規表現を使いたい</h3>
+<p>さて、上記のサンプルでさらっと <code>u32string</code> とか使っちゃってますが、このシノニムはドラフトの 21.3 にてちゃんと明記された標準のものです。もちろん、 <code>u16string</code> というのも存在します (<code>u8string</code> は無いので、考慮されているのはアラインメントのみと考えるべきですが…)。</p>
+<p>しかし、「28 Regular expressions library」の章においては、 <code>char32_t</code> という文字はカケラも hit しません。標準の <code>&lt;regex&gt;</code> においては、 <code>char16_t</code>、 <code>char32_t</code> への対応は見送られてしまっているようです。</p>
+<p>もちろん、<code>basic_regex</code> はテンプレートクラスなのですから、自分でテンプレートパラメータを指定してあげればうまくいきそうに見えます。しかし、<a href="/blog/2010/09/22/u32regex-bad-cast.html" title="はらぺこ日誌? ブログアーカイブ ? char32_t だと regex が使えない">同様の試みを Boost.Regex について行った際には、 <code>std::bad_cast</code> 例外が送出されてプログラムがエラー終了してしまいました</a>。将来的には、あるいは処理系によってはうまく動かせる (ようになる) のかもしれませんが、あまり期待は持たない方が良いかもしれません…。</p>
+<p># そもそも <a href="http://gcc.gnu.org/onlinedocs/libstdc++/manual/status.html#status.iso.200x" title="C++ 200x - Chapter 1. Status (libstdc++)">GCC (libstdc++) では <code>&lt;regex&gt;</code> 自体がまだちゃんと実装されてなかったり</a>… orz</p>
+<p>もっとも、<a href="/blog/2011/09/21/boostregex-icu-with-char32_t.html" title="はらぺこ日誌? ブログアーカイブ ? Boost.Regex の ICU 拡張と char32_t は相性がいいかも?">Boost.Regex の ICU 拡張における <code>UChar32</code> と <code>char32_t</code> (およびそれらの配列へのポインタ) を無理矢理キャストして使うと割と上手く行くっぽかったりする</a>ので、どうにかこうにかラッパーを書いて当座はそれで凌ぐというのも手かもしれません…。</p>
+<p>ちなみに、<code>char</code> と UTF-8 を使用するのであれば <code>&lt;regex&gt;</code> はそのまま使えるはずですが、その場合、 (Boost.Regex と同様に) <a href="/blog/2010/09/22/utf-8-is-nice.html" title="はらぺこ日誌? ブログアーカイブ ? UTF-8 もイマイチだが…"><code>&lt;regex&gt;</code> は UTF-8 を知らないので、マルチバイト特有の問題に悩まされることになる</a>でしょう。少なくとも日本語の文字に対する量指定子 (<q><code>あ+</code></q> とか <q><code>あ?</code></q> とか) は期待通りには動きません。</p>
+<p>仮に、<code>&lt;regex&gt;</code> が <code>char32_t</code> で利用できる場合、先のサンプルは以下のようなコーディングになるでしょう。こういう風に組める日がいつか来るといいですね… <tt>(;_;)/</tt>。</p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &lt;string&gt;
+#include &lt;regex&gt;
+
+#include "EncodeString.hpp"
+
+using namespace std;
+
+typedef basic_regex&lt;char32_t, regex_traits&lt;char32_t&gt;&gt; u32regex;
+typedef match_results&lt;u32string::const_iterator&gt; u32smatch;
+
+
+int main()
+{
+    u32string before = U"てくまくまやこんてくまくまやこん むらやましゃちょうよ おおきなくまにな～ぁれ";
+    u32string after;
+    u32regex reg(U"くま");
+    u32smatch match;
+
+    u32string textbuf = before;
+    while (regex_search(textbuf, match, reg)) {
+        after += match.prefix().str() + U"ぱんだ";
+        textbuf = match.suffix().str();
+    }
+    after += textbuf;
+
+    cout &lt;&lt; "before: " &lt;&lt; EncodeString&lt;char32_t, chset_Utf32&gt;(before, chset_Utf8).getCharArray() &lt;&lt; endl;
+    cout &lt;&lt; "after: " &lt;&lt; EncodeString&lt;char32_t, chset_Utf32&gt;(after, chset_Utf8).getCharArray() &lt;&lt; endl;
+
+    return 0;
+}
+</pre>
+<p><small>2011 年 12 月 27 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

@@ -1,0 +1,130 @@
+<h1>MinGW に GCC 4.4.0 を導入する</h1>
+
+<div class="entry">
+<p>otoco の<a href="/trac-wiki/otoco/%E5%A4%96%E9%83%A8%E4%BB%95%E6%A7%98/%E3%82%B3%E3%82%A2%E3%83%87%E3%83%BC%E3%82%BF.html">コアデータの仕様</a>がだいぶ形になってきたので、いよいよ<a href="http://developer.harapeko.jp/trac/original/otoco/ticket/6" title="#6 (コアデータクラスを実装する) – otoco">実装を開始しました</a>。本当はメインマシンに Linux 環境を整え直してそっちで開発を進めたいのですが、現状お金をもらってメインでやらせて頂いている仕事が Windows 環境での開発なので、並行して作業を行いやすいよう、 Windows 向けのバイナリを生成する環境として検討している <a href="http://www.mingw.org/">MinGW</a> を導入し、とりあえずはこちらで開発を進めてみることにしました。<br/>
+<span id="more-115"></span><br/>
+まだビルドが通る状態ですらないので、とりあえずミニマムケースでテストコードを書きながら、手探り状態で実装を進めているのですが、はて、 <code>int32_t</code> などの型の <code>typedef</code> が定義されている <code>stdint.h</code> の C++ 版である <code>&lt;cstdint&gt;</code> を使う場合、これらの型名は <code>std::int32_t</code> になるのやら、それとも <code>::int32_t</code> になるのやら、どっちだったかなぁと思い、テストプログラムに</p>
+<pre>
+#include &lt;cstdint&gt;
+</pre>
+<p>と書いてみたものの、これがさっぱり通らない。おおそうか、そもそも <code>&lt;cstdint&gt;</code> なんて存在しないのか、などと Twitter で<a href="http://twitter.com/T_MURACHI/status/22237400924" title="Twitter / T.MURACHI: うは、 cstdint って存在しないのか。(←超初 ...">つぶやいてみました</a>ところ、ご親切な方から VC10 (<a href="http://www.microsoft.com/japan/visualstudio/" title="Microsoft Visual Studio 2010 - Visual Studio 2010 オフィシャル サイト">Visual Studio 2010</a> の C/C++ コンパイラのことですね) にはありますよ、との<a href="http://twitter.com/cpp_akira/statuses/22237455915" title="Twitter / Faith and Brave: VC10にはありますね。 RT @T_MURACHI ...">お返事</a>が。</p>
+<p>さらにもう一つ気がかりなことに、 hashmap 的なものってもう標準化されていなかったかなぁと思いつつ調べてみたところ、 C++0x であれば <code>std::unordered_map</code> が使えると言うことが分かったので、早速これも試してみようとテストプログラムに</p>
+<pre>
+#include &lt;unordered_map&gt;
+</pre>
+<p>と書いてみたところ、やっぱりこれもさっぱり通らない。で、どちらも MinGW のインストールディレクトリ以下にヘッダファイルが存在するのか検索してみると、なるほど確かにファイル自体が存在しない。</p>
+<p>そもそも GCC は C++0x に対応しているのか? と調べてみると、軽くぐぐってみた限りでもバージョン 4.4 および 4.5 で C++0x への対応を改善したとのニュース記事が見つかるので、おそらくは 4.x 系であれば対応を進めてはいるんだろうなぁと言うことは伺えるわけです。</p>
+<p>MinGW は割と最近導入したので、まさか古い GCC が採用されているなどとは疑いもしていなかったのですが、ここで念のためにとバージョンを確かめてみると、なんと<strong>デフォルトでインストールされている GCC のバージョンは 3.4.5</strong> だというじゃないですか。</p>
+<p>まさか MinGW 版の GCC が 3.4.5 で開発が止まっているなどとはさすがに思えなかったので、早速 4.x 系にバージョンアップする方法はないかと調べてみたところ、なんのことはない、 MinGW の<a href="http://sourceforge.net/projects/mingw/files/" title="Browse MinGW - Minimalist GNU for Windows Files on SourceForge.net">ダウンロードサイト</a>に普通に用意されていて、それを展開して上書きインストールすれば済む話だったのでした (やり方の詳細は<a href="/trac-wiki/otoco/%E6%8A%80%E8%A1%93%E3%83%A1%E3%83%A2/MinGW%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97.html" title="技術メモ/MinGWセットアップ – otoco">技術メモ</a>をご参照のこと)。</p>
+<p>これでいよいよ <code>&lt;cstdint&gt;</code> も <code>&lt;unordered_map&gt;</code> も使える! ということで、早速以下のようなテストプログラムを書いてみました。</p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;unordered_map&gt;
+#include &lt;cstdint&gt;
+
+int main()
+{
+	std::unordered_map&lt;std::string, std::string&gt; murachi;
+	murachi["name"] = "Toshiyuki Murayama";
+	murachi["handle"] = "T.MURACHI";
+	murachi["age"] = "32";
+	
+	std::cout &lt;&lt; "I'm " &lt;&lt; murachi["handle"] &lt;&lt; "(" &lt;&lt; murachi["name"] &lt;&lt; "), " &lt;&lt;
+		murachi["age"] &lt;&lt; " years old." &lt;&lt; std::endl;
+	
+	std::int32_t hoge = 12345;
+	std::cout &lt;&lt; "hoge = " &lt;&lt; hoge &lt;&lt; std::endl;
+	
+	return 0;
+}
+</pre>
+<p>これを <code>test.cpp</code> という名前で保存し、コンパイルを試みますが…</p>
+<pre>
+murachi@YUMA ~
+$ g++ -o test test.cpp
+c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/unordered_map:35 ､ｫ､・include
+､ｵ､・ｿ･ﾕ･｡･､･・・ﾂｿｽﾅ include ､ｫ､鬢ﾎﾊﾝｸ釥ｬﾍｭｱﾗ､ﾈ､ﾊ､・ﾇ､ｷ､遉ｦ:
+,
+                 test.cpp:3 ､ｫ､・ISO C ､ﾇ､ﾏﾌｾﾁｰ､ﾄ､ｭｲﾄﾊﾑｰ惞ﾞ･ｯ･惕ｷ､ﾞ､ｻ､・IS
+O C99 ､ﾏｻﾈﾍﾑ､ｵ､・・ﾙ､ｭｻﾄ､熙ﾎ､ﾎｰ惞ﾗｵ皃ｷ､ﾞ､ｹ:
+c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/c++0x_warning.h:31:2: error: #
+error This file requires compiler and library support for the upcoming ISO C++ s
+tandard, C++0x. This support is currently experimental, and must be enabled with
+ the -std=c++0x or -std=gnu++0x compiler options.
+test.cpp: In function 'int main()':
+test.cpp:8: error: 'unordered_map' is not a member of 'std'
+test.cpp:8: error: expected primary-expression before ',' token
+test.cpp:8: error: expected primary-expression before '&gt;' token
+test.cpp:8: error: 'murachi' was not declared in this scope
+
+murachi@YUMA ~
+$
+</pre>
+<p>なんだか文字化けしたエラーが出てきてしまいました。新しいバージョンの GCC はエラーを日本語で出してくれるのか? 何はともあれ、そのすぐ後ろに GCC のオプションに関するヒントが綴られていたので、「そうか C++0x 固有の機能を利用するには <code>-std=c++0x</code> オプションか <code>-std=gnu++0x</code> オプションのどっちかを指定してあげる必要があるんだな」と気づくことができました。</p>
+<p>で、なんとなく <code>-std=c++0x</code> オプションの方がまだ標準っぽい感じがしたので、それを試してみたのですが、</p>
+<pre>
+murachi@YUMA ~
+$ g++ -std=c++0x -o test test.cpp
+In file included from c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/bits/pos
+types.h:42,
+                 from c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/iosfwd:4
+2,
+                 from c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/ios:39,
+                 from c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/ostream:
+40,
+                 from c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/iostream
+:40,
+                 from test.cpp:1:
+c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/cwchar:159: error: '::swprintf
+' has not been declared
+c:\mingw\bin\../lib/gcc/mingw32/4.4.0/include/c++/cwchar:166: error: '::vswprint
+f' has not been declared
+
+murachi@YUMA ~
+$
+</pre>
+<p>今度は <code>&lt;iostream&gt;</code> から巡り巡って参照されている <code>&lt;cwchar&gt;</code> の中で、存在しないシンボルが参照されようとしている、と怒られてしまいました。 <code>cwchar</code> ファイルの中も一応覗いてみましたが、これを書き換えてしまうのもよくないので、とりあえず一か八かでもう一つのオプション <code>-std=gnu++0x</code> を試してみることに。すると…</p>
+<pre>
+murachi@YUMA ~
+$ g++ -std=gnu++0x -o test test.cpp
+
+murachi@YUMA ~
+$ ./test
+I'm T.MURACHI(Toshiyuki Murayama), 32 years old.
+hoge = 12345
+
+murachi@YUMA ~
+$
+</pre>
+<p>こんどはちゃんとコンパイルが通り、プログラムも期待したとおりに動作しました。</p>
+<p>と、いうわけで、おさらいです。</p>
+<ul>
+<li>GCC のバージョンはちゃんと確認しよう。
+<ul>
+<li>特に、C++0x 固有の機能を用いるのであれば、 GCC 4.x 以降が必要になる。</li>
+<li>クロスプラットフォーム対応を前提とする場合、対応予定の全ての環境で確認し、開発に用いる GCC のバージョンをプロジェクト内で決めてしまい、それを用いるよう徹底してしまった方がよいかも…。</li>
+</ul>
+</li>
+<li>GCC で <code>&lt;unordered_map&gt;</code> などの C++0x 固有の機能を用いる場合、 <code>g++</code> コマンドにオプション <code>-std=gnu++0x</code> を付加する必要がある。
+<ul>
+<li>おそらく GCC 固有のオプションなので、 GCC 固有の機能を許可してしまっている可能性もある。 GCC 以外のコンパイラにも対応させたいのであれば、可搬性には特に注意する必要がある、かも知れない。</li>
+</ul>
+</li>
+</ul>
+<p>ちなみに、先ほどのサンプルプログラムは <code>&lt;unordered_map&gt;</code> と <code>&lt;cstdint&gt;</code> の両方をテストしていて、特に後者については以下のような記述で利用しているのですが、</p>
+<pre>
+	std::int32_t hoge = 12345;  // int32_t は std 名前空間に存在する
+</pre>
+<p>実際のところ、この記述は下記のように書き換えてもコンパイルは通ります。</p>
+<pre>
+	::int32_t hoge = 12345; // int32_t はグローバル名前空間にも存在する…!?
+</pre>
+<p>C++0x の仕様についてはまだちゃんと目を通していないので、どちらがより推奨されているのかは分かりません。この辺は後でちゃんと確認しておかねば…。</p>
+<p>それから、そもそも C++0x には初期化リストなどの構文糖や型推論、ラムダ、Unicode 用の文字型と Unicode リテラル (UTF-32 リテラルと libiconv の UCS-4-INTERNAL って互換性あるのかなぁ…これも後で調べなきゃ…)、そしてタプルや正規表現 (<code>std::basic_regex</code>!!) などの追加ライブラリ群などなど…さまざまな機能の追加がなされているので、それらについても一通りさらうなり有用な書籍を探す (日本語の文献は…無いかなぁ…) なりしておかないとなぁとか思ったりするわけです (こうやってブログ記事にする為にちょっと <a href="http://ja.wikipedia.org/wiki/C%2B%2B0x" title="C++0x - Wikipedia">Wikipedia に目を通してみた</a>だけでもまぁいろいろと…また実装方針を考え直さないといけない部分も結構出てきてるなぁ… <tt>^_^;</tt>)。</p>
+<p><small>2010 年 8 月 31 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

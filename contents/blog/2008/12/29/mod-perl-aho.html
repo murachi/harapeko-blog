@@ -1,0 +1,184 @@
+<h1>mod_perl であほプログラムを作ってみた。</h1>
+
+<div class="entry">
+<h3>はじめに</h3>
+<p>自社開発で作ろうとしていた物が実は mod_perl に対応した Web アプリなのですが、そういえば mod_perl ってまともに弄ったこと無かったなぁとか思ったので、風邪も引いて頭も回らないことだし少し脱線するかとばかりに遊んでみました。</p>
+<p>世間一般においてはちっともはやらない mod_perl 。かろうじて拾う話題もせいぜい Apache::Registry を用いた既存 CGI の高速化とかその程度の話で、本格的に Perl で Apache モジュールを作ろうみたいな話になると本を買うか英語で情報を探すしかなかったりするのが現状のようです (あるいはおいらの探し方が悪いのかも知れませんが…)。参考にしたのは mod_perl の公式サイトにあるドキュメントでした。</p>
+<ul>
+<li><a href="http://perl.apache.org/docs/2.0/index.html">mod_perl: mod_perl 2.0 Documentation</a></li>
+</ul>
+<p>これ全体をぼえ～っと眺めてみても何から手をつければいいのかよくわからないのですが、<a href="http://perl.apache.org/docs/2.0/user/config/config.html#Examples" title="mod_perl: mod_perl 2.0 Server Configuration#Examples">この辺</a>を見てみるとサンプルを見つけることができたので、これを参考に作ってみることにします。</p>
+<p><span id="more-21"></span></p>
+<h3>動かす場所 (URI) を決める</h3>
+<p>とりあえず弊社の環境では test という名のサブドメインを設け、 <code>http://test.harapeko.jp/aho</code> にアクセスするとプログラムが実行できるということにしてみました。もちろん、サブドメインを設けるには、named (BIND) の設定追加と、 Apache 側の設定が必要です。</p>
+<p>サブドメインとか面倒な人は、この辺は読み飛ばしちゃってください。BIND の設定については、ここでは省きます。</p>
+<p>Apache 側の設定ですが、あとでここに mod_perl に関する設定も書き加えるので、 <code>mod_perl.c</code> モジュールが見える場所に記述するようにしてください (<code>mod_perl.c</code> を <code>LoadModule</code> している特別な設定ファイルがあるのであれば、その中に記述します)。</p>
+<pre>
+&lt;IfModule mod_perl.c&gt;
+
+&lt;VirtualHost *:80&gt;
+  ServerName test.harapeko.jp
+  DocumentRoot /var/www/vhosts/test/htdocs
+  ErrorLog logs/test-error_log
+  CustomLog logs/test-access_log common
+&lt;/VirtualHost&gt;
+
+&lt;/IfModule&gt;
+</pre>
+<h3>mod_perl モジュールとしてあほプログラムを書く</h3>
+<p>mod_perl モジュールとしてロードできるのは、<code>@INC</code> のパスが通ったディレクトリに置いてあるモジュールファイルだけです。つまり、通常は Cpan などから正規にインストールしたモジュールだけです。</p>
+<p>ただ、 mod_perl の実行中は Apache の設定で <code>ServerRoot</code> に設定されているディレクトリにも <code>@INC</code> のパスが通るようなので、テスト目的でちょっとしたプログラムを書きたいだけならば、この配下にファイルを置いていけばいいでしょう。弊社の環境では <code>/etc/httpd</code> が <code>ServerRoot</code> に設定されているので、例えばモジュールのパッケージ名を <code>MpTest::AhoAho</code> にするのであれば、モジュールファイルは <code>/etc/httpd/MpTest/AhoAho.pm</code> とします。</p>
+<p>以下、そのサンプルコードです。</p>
+<pre>
+package MpTest::AhoAho;
+
+use strict;
+use utf8;
+
+use Encode;
+use Apache2::RequestRec ();
+use Apache2::RequestIO ();
+use Apache2::Const -compile =&gt; qw( :common :http );
+
+my $urlEncode;
+
+sub handler {
+	my $r = shift;
+	$r-&gt;content_type( 'text/html; charset=UTF-8' );
+	if ( $r-&gt;method eq 'GET' )
+	{
+		$r-&gt;print( encode( 'UTF-8', &lt;&lt;ENDLINE ) );
+&lt;html&gt;&lt;head&gt;&lt;title&gt;あほあほ!!&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;あほあほ!!&lt;/h1&gt;
+&lt;form method="POST" action="${ \ $r-&gt;uri }"&gt;
+&lt;p&gt;どう思いますか? &amp;gt;&lt;input type="text" name="hoge" size="50"&gt;
+&lt;input type="submit" value="送信"&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+ENDLINE
+	}
+	elsif ( $r-&gt;method eq 'POST' )
+	{
+		my $length = $r-&gt;headers_in-&gt;{ 'Content-Length' };
+		if ( $length &gt; 1024 ){
+			$r-&gt;status( Apache2::Const::HTTP_BAD_REQUEST );
+			$r-&gt;print( encode( 'UTF-8', &lt;&lt;ENDLINE ) );
+&lt;html&gt;&lt;head&gt;&lt;title&gt;話が長すぎじゃばっかも～～～ん!!!&lt;/title&gt;
+&lt;body&gt;
+&lt;h1&gt;話が長すぎじゃばっかも～～～ん!!!&lt;/h1&gt;
+&lt;p&gt;1KB 以内に納めて来い!!&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;a href="${ \ $r-&gt;uri }"&gt;もう一回?&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+ENDLINE
+			return Apache2::Const::OK;
+		}
+		my $buf;
+		$r-&gt;read( $buf, $length ) == $length	or die '???';
+		my $request = $urlEncode-&gt;( $buf );
+		my $comment = "$request-&gt;{ hoge } としか言えない貴様はやっぱりあほだ!!!";
+		$r-&gt;print( encode( 'UTF-8', &lt;&lt;ENDLINE ) );
+&lt;html&gt;&lt;head&gt;&lt;title&gt;あほあほあほ!!!&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;$comment&lt;/h1&gt;
+
+&lt;p&gt;
+ENDLINE
+		for ( 1 .. 1000 )
+		{
+			$r-&gt;print( encode( 'UTF-8', "$comment " ) );
+		}
+		$r-&gt;print( encode( 'UTF-8', &lt;&lt;ENDLINE ) );
+&lt;/p&gt;
+
+&lt;hr&gt;
+&lt;p&gt;&lt;a href="${ \ $r-&gt;uri }"&gt;もう一回?&lt;/a&gt;&lt;/p&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+ENDLINE
+	}
+	return Apache2::Const::OK;
+}
+
+$urlEncode = sub {
+	my $url = shift;
+	my %map;
+	for my $pair ( split /&amp;/, $url )
+	{
+		my ( $name, $val ) = split /=/, $pair;
+		$name =~ tr/+/ /;
+		$name =~ s/%([\da-f][\da-f])/pack 'H2', $1/ieg;
+		$name = decode( 'UTF-8', $name );
+		$val =~ tr/+/ /;
+		$val =~ s/%([\da-f][\da-f])/pack 'H2', $1/ieg;
+		$val = decode( 'UTF-8', $val );
+		$map{ $name } = $val;
+	}
+	return \%map;
+};
+
+1;
+__END__
+</pre>
+<h3>URI アクセスに応じてモジュールが動くように設定する</h3>
+<p>プログラムができたら、それを URI に関連づけます。先の手順でサブドメインの追加を行っていれば、その <code>&lt;VertualHost&gt;</code> ディレクティブの中に、以下のように設定を追加します。</p>
+<pre>
+&lt;VirtualHost *:80&gt;
+  ServerName test.harapeko.jp
+  DocumentRoot /var/www/vhosts/test/htdocs
+  ErrorLog logs/test-error_log
+  CustomLog logs/test-access_log common
+
+  # 追加 --ここから
+  PerlModule APR::Table  # 要らないかも。後述
+  PerlModule MpTest::AhoAho
+  &lt;Location /aho&gt;
+    SetHandler modperl
+    PerlResponseHandler MpTest::AhoAho
+  &lt;/Location&gt;
+  # 追加 --ここまで
+&lt;/VirtualHost&gt;
+</pre>
+<p>これで設定完了です。 <code>apache2ctl configtest</code> (または <code>/etc/init.d/httpd configtest</code> 等) で設定ファイルの文法を確認したら、 <code>apache2ctl restart</code> (または <code>/etc/init.d/httpd restart</code> 等) で再起動しましょう。</p>
+<h3>実際に動いている物サンプル</h3>
+<p><a href="http://test.harapeko.jp/aho" title="あほあほ!!">実際に動いているサンプルです</a>。もうなんて言うか<strong>激しくごめんなさい</strong>。 orz</p>
+<h3>解説</h3>
+<p>それでは解説です。まず、 Apache 側の設定ファイル中でキモになる記述は以下の部分です。</p>
+<pre>
+  PerlModule MpTest::AhoAho
+  &lt;Location /aho&gt;
+    SetHandler modperl
+    PerlResponseHandler MpTest::AhoAho
+  &lt;/Location&gt;
+</pre>
+<p><code>PerlModule</code> はモジュールをロードする宣言で、この行は実は無くても動きます。が、書いておくと Apache の起動時にロードしてコンパイルまで済ませておいてくれるので、多分早くなるんだと思います (多分ってなんだよ＞ヲレ)。</p>
+<p><code>PerlResponseHandler</code> は、Apache がクライアントにレスポンスを返す際に呼び出すハンドラモジュールを指定する宣言です。つまり、大雑把に言うと、ここで指定したモジュールの <code>handler</code> メソッドが、 URI アクセス時に呼び出されます。上記のサンプルではこの宣言は <code>&lt;Location /aho&gt;</code> ディレクティブ内に記述されているので、「<code>/aho</code> の URI にアクセスしてきた場合は、応答時に <code>MpTest::AhoAho-&gt;handler</code> を実行する」という意味になります。</p>
+<p><code>SetHandler</code> は <code>PerlResponseHandler</code> などのハンドラを指定する宣言を書く場所では必ず書いておく必要のある宣言です。引数は <code>modperl</code> と <code>perl-script</code> の 2種類があって、後者はレガシーなスクリプトとの互換性を重視するためか、プログラム中でそのまま使える <code>print</code> 関数や <code>%ENV</code> などにアクセスできるようになります。今回は敢えてそれができない <code>modperl</code> の方を選んでみました。</p>
+<p>次にプログラムですが、内容的には <code>GET</code> アクセス時は質問ページを、 <code>POST</code> アクセス時は罵倒ページを表示するというただそれだけの物です。但し POST したデータが長すぎる (1KB を超える) 場合には自前でエラーを表示するようにしています (ちゃんと <code>400 Bad Request</code> を返しているので、IE で試すと IE 謹製のエラー画面が表示されるはずです)。</p>
+<p><code>use Apache2::*</code> シリーズはいずれもほぼ必須と考えていいと思います。<code>Apache2::RequestRec</code> と <code>Apache2::RequestIO</code> は、ハンドラ内で最初に受け取るリクエストオブジェクトの各メソッドにアクセスできるようにするためのモジュールで、前者はステータス値や HTTP ヘッダー、環境変数などへのアクセス用、後者はコンテンツの入出力用です。例えば <code>$r-&gt;method</code> や <code>$r-&gt;uri</code>、 <code>$r-&gt;headers_in</code> などを参照したり、<code>$r-&gt;content_type</code> で出力用の <code>Content-type:</code> ヘッダーを設定したりするには <code>Apache2::RequestRec</code> が、 <code>$r-&gt;print</code> でコンテンツを出力したり、 <code>$r-&gt;read</code> で POST を入力したりするには <code>Apache2::RequestIO</code> がそれぞれ必要になります。</p>
+<p><code>Apache2::Const</code> モジュールは各種定数の定義です。引数リストで使用する定数を宣言できますが、その最初に <code>'-compile'</code> と入れておくと、定数名をグローバル名前空間に展開しません (その場合は、 <code>Apache2::Const::<em>HOGE_FUGA</em></code> としてアクセスします)。</p>
+<p>Apache はこのモジュールの <code>handler</code> 関数を呼び出し、最初の引数にリクエストオブジェクトを渡します。そして、自前の処理を実行しつつ、リクエストオブジェクトの各メソッドを適切に呼んであげてから、 <code>Apache2::Const::OK</code> を返してあげればいい、という流れです。あとは、<a href="http://perl.apache.org/docs/2.0/api/index.html" title="mod_perl: mod_perl 2.0 API">API のリファレンス</a>とにらめっこしつつ読みこなしていただければ、やっていることは大体解ると思います。</p>
+<h3><code>$r-&gt;headers_in</code> メソッド呼び出しでエラーが発生する場合</h3>
+<p>ところで、 Apache 側の設定で、以下の行について説明していませんでしたが、</p>
+<pre>
+  PerlModule APR::Table  # 要らないかも。後述
+</pre>
+<p>この宣言は、 <code>$r-&gt;headers_in</code> メソッドにアクセスした際、以下のようなエラーが発生してしまうのを回避するためのものです。自宅で宅内サーバーにしているマシン@debian では発生しなかったのですが、会社サーバー@centos では発生するので、念のため付記しておきます。</p>
+<pre>
+[Mon Dec 29 18:47:51 2008] [error] [client 218.219.204.253] Can't locate object
+method "FETCH" via package "APR::Table" at /etc/httpd/MpTest/AhoAho.pm line 32.\
+n, referer: http://test.harapeko.jp/aho
+</pre>
+<p>この解決法については、以下のサイトを参考にしました。</p>
+<ul>
+<li><a href="http://mail-archives.apache.org/mod_mbox/perl-modperl/200409.mbox/%3CPine.LNX.4.44.0409211243080.6717-100000@cartman.nederhost.net%3E">Re: [mp2] APR::Table FETCH method not found (reported when using $r-&gt;headers_in-&gt;{Cookie}</a></li>
+</ul>
+<p><small>2008 年 12 月 29 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

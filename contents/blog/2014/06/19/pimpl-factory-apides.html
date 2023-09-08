@@ -1,0 +1,33 @@
+<h1>Pimpl とかファクトリとか – C++ のための API デザイン</h1>
+
+<div class="entry">
+<p><a href="http://developer.harapeko.jp/trac/original/otoco">otoco プロジェクト</a>の開発に着手するにあたって、私はまだ C++ でのライブラリ開発を 1 からコーディネートした経験がなかったので、クロスプラットフォームに対応したライブラリ API の開発手法を学ぶ必要があると感じました。ちょうどいい感じの教材が割りと最近出ていたようで、早速購入し、勉強を進めています。</p>
+<ul>
+<li><a href="http://www.amazon.co.jp/gp/search/ref=as_li_qf_sp_sr_il?ie=UTF8&amp;camp=247&amp;creative=1211&amp;index=aps&amp;keywords=C%2B%2B%20API%E3%83%87%E3%82%B6%E3%82%A4%E3%83%B3&amp;linkCode=as2&amp;tag=harapekoinc-22">C++ APIデザイン<br/>
+<img border="0" src="http://ws-fe.amazon-adsystem.com/widgets/q?_encoding=UTF8&amp;ASIN=B00EYXMA6Q&amp;Format=_SL250_&amp;ID=AsinImage&amp;MarketPlace=JP&amp;ServiceVersion=20070822&amp;WS=1&amp;tag=harapekoinc-22"/></a></li>
+</ul>
+<p>C++11 についても若干触れられているようで (原著執筆当時はまだ C++0x と呼ばれていた模様…)、この手の教材の中では比較的情報が新しい方なんではないかと思われます。</p>
+<p>実はこの本を買って勉強し始めたのはもう結構前 (確か前原にいた頃… 昨年の暮れ頃?) なのですが、ここしばらく本業やら引っ越しやらが忙しくてなかなか手を回せずにいたので、久しぶりの着手ということで、すでに履修していた第3章の、 Pimpl イディオムとファクトリメソッド辺りを復習してみました。<br/>
+<span id="more-304"></span><br/>
+今度こそ本腰を入れてちゃんとやろう、ということで、<a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/api-design-for-c%2B%2B" title="samples-for-blog/c++/api-design-for-c++ at master · murachi/samples-for-blog">練習用に書いたサンプルプログラムは github に up しております</a>。 git の練習も兼ねているのですが…。</p>
+<h3>Pimpl イディオム</h3>
+<p>C++ でライブラリを実装するのに際して最も基本的とも言うべきテクニックです。 2章の中で、優れた API の特徴について議論されていますが、その中でも Pimpl イディオムは、プラットフォーム独立性を高める働きと、結合度を削減する働きを担っています。本書のサンプルではタイマーを取り上げ、 Unix の getTimeOfDay(2) システムコールと Win32 の <code>GetTickCount()</code> API の両方に対応する場合に、 Pimpl イディオムを用いて実装の詳細をヘッダーファイルから <code>.cpp</code> ファイルへ隠すというものでした。</p>
+<ul>
+<li><a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/api-design-for-c%2B%2B/ch03-pattern/pimpl" title="samples-for-blog/c++/api-design-for-c++/ch03-pattern/pimpl at master · murachi/samples-for-blog">Pimpl イディオムのサンプルプログラム</a></li>
+</ul>
+<p>私が書いたサンプルもほぼ同内容です (メインルーチンはお馴染みの? あほプログラムでやんす)。強いて違いを言えば、 Pimpl を <code>std::unique_ptr</code> に突っ込んでいること (本書では <code>boost::scoped_ptr</code> を採用していました) ぐらいでしょうか。</p>
+<h3>ファクトリメソッド</h3>
+<p>本書では Pimpl イディオムの次にシングルトンパターンを解説していますが、今回はここは一旦飛ばして (書かれていることは有用なので、目を通すことはおすすめします)、ファクトリメソッドの方をさらってみました。</p>
+<p>本書で紹介されているファクトリメソッドは、 GoF のファクトリメソッドパターンとは若干異なるようで、 Creator の継承と Product の継承を連動させて云々、というものではなく、単に値による指定で生成するオブジェクトの種類を切り替えるという類のもののようでした。これはこれで、例えばプラグインの実装なんかでは役に立ちそうなテクニックだとは思います。</p>
+<ul>
+<li><a href="https://github.com/murachi/samples-for-blog/tree/master/c%2B%2B/api-design-for-c%2B%2B/ch03-pattern/factory" title="samples-for-blog/c++/api-design-for-c++/ch03-pattern/factory at master · murachi/samples-for-blog">ファクトリメソッドのサンプルプログラム</a></li>
+</ul>
+<p>拡張可能なファクトリの応用として、ファクトリ登録を生成されるオブジェクトのクラス毎に行うようにし、 Product の追加が行いやすいような設計にしてみました。この用途に限れば登録解除は不要だろうということで、登録用のメソッドのみ用意。ファクトリ名とコールバックの保存には、グローバル変数<strong>ではなく</strong>、関数内 <code>static</code> 変数として用意した <code>std::unordered_map</code> に格納することで、コンパイル単位をまたいだ非ローカル静的オブジェクトの初期化順に伴うSEGVりを回避しています (この辺のことはそれこそ本書のシングルトンの項にて、 Scott Meyers の言葉を引用しつつ説明されています)。</p>
+<p>また、せっかくなので極力 Pimpl を用いるようにしてみました。プラットフォーム独立性も重要ですが、それを考慮する必要のない場面でも、 <code>private</code> メソッドの追加・変更に伴う再コンパイルを気にする必要がなくなることによるメンテナンス性の向上 (修正・改変・リファクタリングのやりやすさ) は非常に重要です。今回作った中では、特に <code>Base64Converter</code> クラスの実装がまぁまぁいいサンプルになったんじゃないかと思います (…<code>Base64Map</code>クラスも <code>.cpp</code> ファイルの中に隠しちゃってもよかったかもなぁ…)。</p>
+<p>今回はここまで。次回があれば、今度はラッピングパターン、オブザーバーパターンあたりをさらえればと思います。</p>
+<p><small>2014 年 6 月 19 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

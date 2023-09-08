@@ -1,0 +1,29 @@
+<h1>Perl の正規表現はリストコンテキストでキャプチャがないと (1) を返す</h1>
+
+<div class="entry">
+<p>Perl で、</p>
+<pre>
+my @cap = $uri{$mkey} =~ /$ex_item-&gt;{match}{$mkey}{pattern}/    or next EX_MATCH_LOOP;
+@vars{@{$ex_item-&gt;{match}{$mkey}{vars}}} = @cap
+    if exists $ex_item-&gt;{match}{$mkey}{vars} &amp;&amp; ref $ex_item-&gt;{match}{$mkey}{vars} eq 'ARRAY';
+</pre>
+<p>なんてコードを書いていて (何をやろうとしているのかは想像にお任せします… 別にプロプライエタリなコードじゃないし、いちいち擬似コード的に書き直すのも面倒なのでそのまま持って来ちゃいましたｗ)、ふと、ここでやっている正規表現のパターンにキャプチャが含まれていなかった場合、マッチするのに <code>or</code> の後に処理が流れてしまうことはないのかと疑問に思いました。<br/>
+<span id="more-158"></span><br/>
+結論としては、上記のコードに問題はないようです (まだテストしてないけど)。以下のように、スモールケースで試してみると、リストコンテキストではパターンにキャプチャがない場合でも空リストを返すのではなく、 <code>(1)</code>、すなわち値 <code>1</code> のみを持つリストを返してくれることが分かります。</p>
+<pre>
+$ perl -e '$x = "foo bar baz"; @s = $x =~ /bar/ or print "no match?\n"; print join(", ", @s), "\n"'
+1
+$ 
+</pre>
+<p>もちろん、キャプチャがある場合には、キャプチャリングされた値がリストとして返されます。</p>
+<pre>
+$ perl -e '$x = "foo bar baz"; @s = $x =~ /(b)(ar)/ or print "no match?\n"; print join(", ", @s), "\n"'
+b, ar
+$ 
+</pre>
+<p><small>2011 年 9 月 1 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

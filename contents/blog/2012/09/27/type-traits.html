@@ -1,0 +1,60 @@
+<h1>コンテナの種類は問わないが、要素の型は限定したい。</h1>
+
+<div class="entry">
+<p>C++ で STL などによる任意のコンテナを引数に取る関数を実装する際、そのコンテナの種類は問わないものの、そのコンテナが持つ要素の型は限定したい、あるいは要素の型に応じて処理内容を切り替えたい、といったニーズがあると思います。</p>
+<p>そのような場合、 C++11 であれば、 <a href="https://sites.google.com/site/cpprefjp/reference/type_traits" title="type_traits - cpprefjp - C++ Library Reference">&lt;type_traits&gt;</a> を利用します。</p>
+<p>以下は、整数の型を要素に持つ任意のコンテナを受け取り、その全要素の合計を返す関数 <code>calcSum()</code> の実装例です。<br/>
+<span id="more-257"></span></p>
+<pre>
+#include &lt;iostream&gt;
+#include &lt;type_traits&gt;
+#include &lt;array&gt;
+#include &lt;set&gt;
+
+extern void * enabler;
+
+template &lt;typename cont_t, typename value_type = typename cont_t::value_type,
+    typename std::enable_if&lt;std::is_integral&lt;typename cont_t::value_type&gt;::value&gt;::type *&amp; = enabler&gt;
+value_type calcSum(cont_t const&amp; container)
+{
+    value_type sum = 0;
+    for (auto n : container)
+        sum += n;
+    return sum;
+}
+
+int main()
+{
+    std::array&lt;int, 5&gt; primes = { 2, 3, 5, 7, 11 };
+    for (int i = 0; i &lt; primes.size(); i++)
+        std::cout &lt;&lt; (i == 0 ? "" : " + ") &lt;&lt; primes[i];
+    std::cout &lt;&lt; " = " &lt;&lt; calcSum(primes) &lt;&lt; std::endl;
+    
+    // std::array&lt;double, 5&gt; floating_nums = { 1.414, 1.732, 2.236, 2.718, 3.142 };
+    // auto result = calcSum(floating_nums);    // エラー: そんな関数無いよ
+    
+    std::multiset&lt;short&gt; nums = { 152, 24, 73, -15, 250, 3, 24 };
+    bool is_first = true;
+    for (auto num : nums) {
+        std::cout &lt;&lt; (is_first ? "" : " + ") &lt;&lt; num;
+        is_first = false;
+    }
+    std::cout &lt;&lt; " = " &lt;&lt; calcSum(nums) &lt;&lt; std::endl;
+    
+    return 0;
+}
+</pre>
+<p>実行結果は以下の通りです。</p>
+<pre>
+2 + 3 + 5 + 7 + 11 = 28
+-15 + 3 + 24 + 24 + 73 + 152 + 250 = 511
+</pre>
+<p>Boost ライブラリを含む C++ 全般の話題を追い続けてきた人であれば当然ご存じの知識だと思います。ええ、そうです、今回は完全に自分用のメモです (汗。こういう書き方があること自体は認識していたのですが、いやー、やっぱり実際に使わないことには身につかないですね <tt>(^_^;A</tt> 。</p>
+<p>基本的には、テンプレートの中で、制限したい通りの条件に適合する場合のみ <code>true</code> になるような定数式を <code>std::enable_if&lt;</code> ～ <code>&gt;</code> で括ってやり、そのクラスメンバである型 <code>type</code> を <code>typename</code> として評価する、というものです。この <code>std::enable_if&lt;foobar&gt;::type</code> は、 <code> foobar</code> が <code>true</code> になる場合のみ (テンプレートの特殊化によって) 定義されるような仕組みになっていて、これが <code>false</code> になってしまう (すなわち、あなたの指定したい条件に合致しない) 呼び出し方をしようとすると、単にオーバーロードできないケースとして無視されます。</p>
+<p>上記のケースでは要素が整数型以外の場合はオーバーロード可能な関数が存在しないものとしてコンパイルエラーになりますが、別途浮動小数点用の実装や <code>std::complex&lt;T&gt;</code> 用の実装、さらには <code>std::string</code> 用の実装なんかも用意してあげることで、それぞれに独自の処理を実現させるということもできちゃう、という寸法です。便利。</p>
+<p><small>2012 年 9 月 27 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

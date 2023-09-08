@@ -1,0 +1,154 @@
+<h1>SVG の  要素を JavaScript で生成して DOM ツリーに追加しても何も表示されない←んなこたぁない</h1>
+
+<div class="entry">
+<p><strong>(投稿直後に追記: この問題は既に解決しております…)</strong><br/>
+<span id="more-244"></span><br/>
+ご無沙汰しております…。決算期が近づいて参りましたね。<strong>今期はほとんど売上立ってませんが</strong>… orz</p>
+<p>それはさておき、新しい仕事で使うことになりそうな技術の調査がてらプロトタイプ作りを進めようとしているのですが、HTML5 のインライン SVG を DOM から操作する際、 ID から要素を参照してその写像を表示する <code>&lt;use&gt;</code> 要素の扱いについて疑問点があったので、ちょっとメモしておくことに。</p>
+<p><code>&lt;use&gt;</code> エレメントについては<a href="http://www.w3.org/TR/SVG/struct.html#UseElement" title="5.6 The ‘use’ element - Document Structure – SVG 1.1 (Second Edition)">W3C の仕様勧告にサンプルがあるのですが</a> (インライン SVG として簡略化して書くと以下のような感じ)、</p>
+<pre>
+&lt;svg width="10cm" height="3cm" viewBox="0 0 100 30"&gt;
+  &lt;defs&gt;
+    &lt;rect id="MyRect" width="60" height="10"/&gt;
+  &lt;/defs&gt;
+  &lt;rect x=".1" y=".1" width="99.8" height="29.8" fill="none" stroke="blue" stroke-width=".2" /&gt;
+  &lt;use x="20" y="10" xlink:href="#MyRect" /&gt;
+&lt;/svg&gt;
+</pre>
+<p>これと同じものを JavaScript から DOM ツリーとして追加していく場合、以下のような実装になりそうなものです。</p>
+<pre>
+var svgns = "http://www.w3.org/2000/svg";
+
+window.addEventListener("load", function() {
+  var container = document.getElementById("container");  // コンテナになる <div> とか
+  var svg = document.createElementNS(svgns, "svg");
+  svg.setAttribute("width", "10cm");
+  svg.setAttribute("height", "3cm");
+  svg.setAttribute("viewBox", "0 0 100 30");
+  container.appendChild(svg);
+
+  var defs = document.createElementNS(svgns, "defs");
+  var rect = document.createElementNS(svgns, "rect");
+  rect.id = "MyRect";
+  rect.setAttribute("width", 60);
+  rect.setAttribute("height", 10);
+  defs.appendChild(rect);
+  svg.appendChild(defs);
+
+  rect = document.createElementNS(svgns, "rect");
+  rect.setAttribute("x", 0.1);
+  rect.setAttribute("y", 0.1);
+  rect.setAttribute("width", 99.8);
+  rect.setAttribute("height", 29.8);
+  rect.setAttribute("fill", "none");
+  rect.setAttribute("stroke", "blue");
+  rect.setAttribute("stroke-width", 0.2);
+  svg.appendChild(rect);
+
+  // 問題はここから…
+  var use_node = document.createElementNS(svgns, "use");
+  use_node.setAttribute("x", 20);
+  use_node.setAttribute("y", 10);
+  use_node.setAttribute("xlink:href", "#MyRect");  // ←注目!
+  svg.appendChild(use_node);
+});
+
+<p>しかしこの実装だと、<code>&lt;use&gt;</code> 要素によって表示されるはずの中央の黒い矩形が表示されません。</p>
+<p>この件について <a href="https://twitter.com/T_MURACHI/status/233457365867962368">Twitter 上でつぶやいていたところ</a>、<a href="https://twitter.com/DEFGHI1977">@DEFGHI1977</a> さんという方から以下のような返信を頂きました。</p>
+<blockquote class="twitter-tweet" data-in-reply-to="233457365867962368" lang="ja"><p><a href="https://twitter.com/t_murachi"><s>@</s><b>t_murachi</b></a> SVGUseElementのhref.baseValに値をぶちこんだら如何でしょう？</p>
+<p>— DEFGHI1977さん (@DEFGHI1977) <a data-datetime="2012-08-09T10:22:23+00:00" href="https://twitter.com/DEFGHI1977/status/233508515648532481">8月 9, 2012</a></p></blockquote>
+<p>はて? <code>&lt;use&gt;</code> 要素の DOM インタフェースは <a href="http://www.w3.org/TR/SVG/struct.html#InterfaceSVGUseElement" title="5.11.8 Interface SVGUseElement - Document Structure – SVG 1.1 (Second Edition)">SVGUseElement</a> なのですが、 W3C の仕様勧告にも、あるいは <a href="https://developer.mozilla.org/ja/docs/DOM/SVGUseElement" title="SVGUseElement | Mozilla Developer Network">MDN のドキュメント</a>にも、 <code>instanceRoot</code> や <code>animatedInstanceRoot</code> といった属性はあるものの、 <code>href</code> という属性については書かれていません。</p>
+<p>しかし、実際に Firebug 上で SVGUseElement のインスタンスをウォッチしてみると、確かに <code>XMLAnimatedString</code> インスタンスとして <code>href</code> 属性が存在しており、逆に仕様勧告には記述されている <code>instanceRoot</code> や <code>animatedInstanceRoot</code> といった属性は存在しませんでした。</p>
+<p>そして、 static に記述したインライン SVG 内の <code>&lt;use&gt;</code> 要素を <code>document.getElementById()</code> して取得した <code>SVGUseElement</code> インスタンスには <code>href.baseVal</code> 属性に然るべき URI 文字列が設定されているのに対し、 JavaScript から生成して <code>&lt;svg&gt;</code> 要素に <code>appendChild()</code> した方の <code>&lt;use&gt;</code> 要素を <code>document.getElementById()</code> して取得した <code>SVGUseElement</code> インスタンスには <code>href.baseVal</code> 属性に空文字列が設定されていました。つまり、 <code>document.createElementNS()</code> によって生成した <code>SVGUseElement</code> インスタンスに対して <code>setAttribute("xlink:href", uri)</code> しても、 <code>href.baseVal</code> 属性に値が設定されず、結果として表示にも反映されなかった、ということのようなのです。</p>
+<p>そこで、 @DEFGHI1977 さんが仰っていた通り、先ほどのコード例の</p>
+<pre>
+  var use_node = document.createElementNS(svgns, "use");
+  use_node.setAttribute("x", 20);
+  use_node.setAttribute("y", 10);
+  use_node.setAttribute("xlink:href", "#MyRect");
+  svg.appendChild(use_node);
+</pre>
+<p>の部分を、</p>
+<pre>
+  var use_node = document.createElementNS(svgns, "use");
+  use_node.setAttribute("x", 20);
+  use_node.setAttribute("y", 10);
+  use_node.href.baseVal = "#MyRect";  // ←修正!!
+  svg.appendChild(use_node);
+</pre>
+<p>と書き直してみたところ、なるほど確かに中央の黒い矩形も表示され、期待通りの動作が得られたのでした (Windows 版の firefox および safari にて確認)。</p>
+<p>しかしこの結果はちょっと釈然としないものがあります。まず、仕様勧告には書かれていなかった <code>href</code> 属性を用いるのは、標準から外れた解決策なのではないかという点です。特定のブラウザにおける現状の実装に依存した解決策であるならば、それは Web 標準化の観点からすれば選択すべきではない方法でしょう。しかしこの点については、私の標準に対する調査が甘いのかも知れません。より新しいバージョンではこのような仕様になっている可能性、あるいはより古いバージョンでこうした仕様になっており、現状多くのブラウザがそうした古いバージョンを採用している可能性もあるかも知れません。</p>
+<p><code>setAttribute()</code> メソッドを利用せずに、インタフェースが用意する属性を直接弄るというやり方にも抵抗があります。 HTML の DOM とは異なり、 SVG の DOM では、多くの SVG 要素を表すインタフェースにおいて、属性は参照用として用意されており、仕様勧告では readonly とされています。実際の所、 readonly とされている属性値は直接書き換えて動作としても反映できるケースが多いようですが (<code>SVGRectElement</code> インスタンスの <code>width.baseVal.newValueSpecifiedUnits()</code> で矩形の幅が変更できちゃうとか)、 readonly とされている以上、そういった実装は (やはり Web 標準化の観点からすれば) 避けるべきなのではないでしょうか。</p>
+<p>今回のケースについても、実は必ずしも <code>setAttribute("xlink:href", uri)</code> が期待通りに動かないわけではありません。 <code>document.createElementNS()</code> して生成した <code>SVGUseElement</code> インスタンスには効果がありませんでしたが、 static なインライン SVG 内の &lt;use&gt; 要素に対して <code>document.getElementById()</code> して取得した <code>SVGUseElement</code> インスタンスに対してはちゃんと動作するのです。以下のサンプルでは中央には黒い矩形ではなく赤い楕円が表示されます。</p>
+<pre>
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+	&lt;title&gt;use 要素を DOM から扱うサンプル&lt;/title&gt;
+	&lt;meta charset="UTF-8"&gt;
+	&lt;script type="text/javascript"&gt;&lt;!--
+var svgns = "http://www.w3.org/2000/svg";
+
+window.addEventListener("load", function() {
+	var use_node = document.getElementById("myUse");
+	use_node.setAttribute("xlink:href", "#MyEllipse");
+});
+//	--&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div&gt;
+&lt;svg width="10cm" height="3cm" viewBox="0 0 100 30"&gt;
+  &lt;defs&gt;
+    &lt;rect id="MyRect" width="60" height="10"/&gt;
+    &lt;ellipse id="MyEllipse" cx="30" cy="5" rx="30" ry="8" fill="red"/&gt;
+  &lt;/defs&gt;
+  &lt;rect x=".1" y=".1" width="99.8" height="29.8" fill="none" stroke="blue" stroke-width=".2" /&gt;
+  &lt;use id="myUse" x="20" y="10" xlink:href="#MyRect" /&gt;
+&lt;/svg&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<p>この辺、どなたかきっちり説明できる詳しい方がいらっしゃったら、是非ご教示いただきたく願います…。<tt>m(_ _)m</tt></p>
+<hr/>
+(直後に<strong>追記</strong>)
+<p>…といった内容のブログ記事を書いて 1分と経たないうちに、 <a href="https://twitter.com/teramako">@teramako</a> 大先生から以下のご指摘を頂きました。</p>
+<blockquote class="twitter-tweet" data-in-reply-to="233779170092675073" lang="ja"><p><a href="https://twitter.com/t_murachi"><s>@</s><b>t_murachi</b></a> 要素の名前空間と属性の名前空間が違うから setAttributeNS でxlinkを設定してあげないといけないのでは…</p>
+<p>— teramakoさん (@teramako) <a data-datetime="2012-08-10T04:24:09+00:00" href="https://twitter.com/teramako/status/233780752758755328">8月 10, 2012</a></p></blockquote>
+<p>うわーなるほど、そういうことなら超納得です… 早速最初のサンプルの先頭に</p>
+<pre>
+var xlinkns = "http://www.w3.org/1999/xlink";
+</pre>
+<p>を追加し、</p>
+<pre>
+  var use_node = document.createElementNS(svgns, "use");
+  use_node.setAttribute("x", 20);
+  use_node.setAttribute("y", 10);
+  use_node.setAttribute("xlink:href", "#MyRect");
+  svg.appendChild(use_node);
+</pre>
+<p>の部分を</p>
+<pre>
+  var use_node = document.createElementNS(svgns, "use");
+  use_node.setAttribute("x", 20);
+  use_node.setAttribute("y", 10);
+  use_node.setAttributeNS(xlinkns, "href", "#MyRect");
+  svg.appendChild(use_node);
+</pre>
+<p>に書き換えてあげたところ、ちゃんと期待通りに黒い矩形が表示されました。</p>
+<p>DOM の名前空間に対する理解が浅かったのが敗因だったわけですね。お恥ずかしい… (///) しかしブログに書いてみて本当によかった。晴れて解決、めでたしめでたしなのであります。</p>
+<hr/>
+(さらに<strong>追記2</strong>)
+<p>@DEFGHI1977 さまからも追加の情報頂きました。</p>
+<blockquote class="twitter-tweet" data-in-reply-to="233779170092675073" lang="ja"><p><a href="https://twitter.com/t_murachi"><s>@</s><b>t_murachi</b></a> SVGUseElementがSVGURIReferenceインターフェースを実装しているので，このhrefプロパティを使っているわけです．参考 <a href="http://t.co/Q5vrJeqw" title="http://www.hcn.zaq.ne.jp/___/SVG11-2nd/types.html#InterfaceSVGURIReference">hcn.zaq.ne.jp/___/SVG11-2nd/…</a></p>
+<p>— DEFGHI1977さん (@DEFGHI1977) <a data-datetime="2012-08-10T04:41:53+00:00" href="https://twitter.com/DEFGHI1977/status/233785214554480641">8月 10, 2012</a></p></blockquote>
+<p>継承関係は追っていたつもりだったんですが完全に見落としていたみたいです… こちらも情報 thanks です!</p>
+
+				<p><small>2012 年 8 月 10 日 by 村山 俊之</small></p>
+								
+				
+
+			</div>
+		</pre></div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

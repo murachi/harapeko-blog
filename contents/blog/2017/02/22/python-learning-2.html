@@ -1,0 +1,106 @@
+<h1>Python習得中 – その2</h1>
+
+<div class="entry">
+<p>Python 習得中です。今日は 3章の 3.2.16 まで。</p>
+<p><span id="more-389"></span></p>
+<h3><code>list</code> コンストラクタに文字列を渡すと一文字ずつに分解してリスト化する</h3>
+<pre>
+&gt;&gt;&gt; list('cat')
+['c', 'a', 't']
+</pre>
+<p>率直に言って気持ち悪いですね(´・ω・`)</p>
+<p>タプルも同じですか。</p>
+<pre>
+&gt;&gt;&gt; tuple('cat')
+('c', 'a', 't')
+</pre>
+<p>素直に <q><code>[</code>〜<code>]</code></q> とか <q><code>(</code>〜<code>)</code></q> とか使えって話ですね。</p>
+<h3><code>[0]</code> はいくつでも重ねられる</h3>
+<p>リストのリストをいじっていて気づいたのですが、</p>
+<pre>
+&gt;&gt;&gt; arr = [['foo', 'bar', 'baz'], ['hoge', 'fuga', 'piyo'], [1, 2, 3]]
+&gt;&gt;&gt; arr[0]
+['foo', 'bar', 'baz']
+&gt;&gt;&gt; arr[0][0]
+'foo'
+&gt;&gt;&gt; arr[0][0][0]
+'f'
+</pre>
+<p>ここまではわかるのですが、</p>
+<pre>
+&gt;&gt;&gt; arr[0][0][0][0]
+'f'
+</pre>
+<p>あ、これできちゃうんだ、と。</p>
+<p>確かに、文字列のオフセット位置を指定して抽出した文字も型としては同じ <code>str</code> 型なので当然と言えば当然なのですが、なんだかもにょる…(´・ω・`)</p>
+<h3>リストから同値の要素を除去する <code>remove()</code> メソッドの挙動</h3>
+<p>リストの先頭から検索して最初に hit した要素を削除する。 hit するものがないと<strong>エラーになる</strong>。</p>
+<pre>
+&gt;&gt;&gt; arr = ['foo', 'bar', 'baz', 'bar', 'qux', 'quux']
+&gt;&gt;&gt; arr
+['foo', 'bar', 'baz', 'bar', 'qux', 'quux']
+&gt;&gt;&gt; arr.remove('bar')
+&gt;&gt;&gt; arr
+['foo', 'baz', 'bar', 'qux', 'quux']
+&gt;&gt;&gt; arr.remove('bar')
+&gt;&gt;&gt; arr
+['foo', 'baz', 'qux', 'quux']
+&gt;&gt;&gt; arr.remove('bar')
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+ValueError: list.remove(x): x not in list
+</pre>
+<p>…使いみちあるの? これ(´・ω・`)</p>
+<p><code>index()</code> メソッドも hit しないとエラーになる。先に <code>in</code> 演算子でテストしておかないとダメってことやね。</p>
+<pre>
+&gt;&gt;&gt; arr = ['foo', 'bar', 'baz', 'bar', 'qux', 'quux']
+&gt;&gt;&gt; arr.index('bar')
+1
+&gt;&gt;&gt; arr.remove('bar')
+&gt;&gt;&gt; arr
+['foo', 'baz', 'bar', 'qux', 'quux']
+&gt;&gt;&gt; arr.index('bar')
+2
+&gt;&gt;&gt; arr.remove('bar')
+&gt;&gt;&gt; arr
+['foo', 'baz', 'qux', 'quux']
+&gt;&gt;&gt; arr.index('bar')
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+ValueError: 'bar' is not in list
+</pre>
+<h3><code>==</code> 演算子でリストの内容を比較できちゃう?</h3>
+<p><code>join()</code> メソッドに関するサンプルを試していて思ったのですが…</p>
+<pre>
+&gt;&gt;&gt; arr = ['foo', 'bar', 'baz']
+&gt;&gt;&gt; sep = ':'
+&gt;&gt;&gt; joined = sep.join(arr)
+&gt;&gt;&gt; joined
+'foo:bar:baz'
+&gt;&gt;&gt; separated = joined.split(sep)
+&gt;&gt;&gt; separated
+['foo', 'bar', 'baz']
+&gt;&gt;&gt; separated == arr
+True
+</pre>
+<p>ものすごく当たり前のことのように配列同士で比較が行われていてすげぇーってなりました…。</p>
+<pre>
+&gt;&gt;&gt; arr1 = ['foo', 'bar', 'baz']
+&gt;&gt;&gt; arr2 = ['foo', 'bar', 'baz']
+&gt;&gt;&gt; arr1 == arr2
+True
+&gt;&gt;&gt; arr1 = [['foo', 'bar', 'baz'], ['hoge', 'fuga', 'piyo']]
+&gt;&gt;&gt; arr2 = [['foo', 'bar', 'baz'], ['hoge', 'fuga', 'piyo']]
+&gt;&gt;&gt; arr1 == arr2
+True
+&gt;&gt;&gt; arr3 = [['foo', 'bar', 'baz'], ['hoge', 'fuga', 'poyo']] #ちょこっと違う
+&gt;&gt;&gt; arr1 == arr3
+False
+</pre>
+<p>階層深くしてもちゃんと比較してくれてますね…。</p>
+<p><small>2017 年 2 月 22 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>

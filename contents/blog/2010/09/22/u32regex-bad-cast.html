@@ -1,0 +1,47 @@
+<h1>char32_t だと regex が使えない</h1>
+
+<div class="entry">
+<p>C++0x では UCS に対応し、<a href="http://ja.wikipedia.org/wiki/C%2B%2B0x#.E6.96.B0.E3.81.9F.E3.81.AA.E6.96.87.E5.AD.97.E5.88.97.E3.83.AA.E3.83.86.E3.83.A9.E3.83.AB" title="新たな文字列リテラル - C++0x - Wikipedia">専用の型やリテラルの記法が導入されました</a>。その関係で、以下の点について調査を行っていました。</p>
+<ol>
+<li>C++0x で UCS を UTF-32 として扱う型 <code>char32_t</code>, <code>u32string</code> およびリテラル <code>U"..."</code> と、 libiconv の UCS-4-INTERNAL との間に互換性はあるか。</li>
+<li>C++0x で新たに追加された正規表現ライブラリ <code>&lt;regex&gt;</code> は利用可能か。</li>
+<li><code>&lt;regex&gt;</code> が利用できない場合、 Boost.Regex を用いて UTF-32 文字列を処理することは可能か。</li>
+</ol>
+<p>これらの調査は、すべて otoco のコアデータを扱うプログラム内で内部文字列に UTF-32 を採用することを前提としたものでした。<br/>
+<span id="more-133"></span><br/>
+結論から言うと、<strong>内部文字列に UTF-32 を採用することは、現時点では諦めざるを得ない、ということになりました。＼(^O^)／</strong> 以下、その解説です。</p>
+<p>1 については、互換性に問題がないことを確認しました。</p>
+<p>2 についてですが、 GCC 4.5 の標準 C++ ライブラリでは、 <code>&lt;regex&gt;</code> のヘッダファイルは存在するものの、ライブラリの実体がまだ用意されていない、という状態のようでした。</p>
+<p>で、 3 についてなのですが… 簡単のため、以下のサンプルを見てみることにします。</p>
+<pre>
+#include &lt;string&gt;
+#include &lt;boost/regex.hpp&gt;
+
+using namespace std;
+
+typedef boost::basic_regex&lt;char32_t, boost::regex_traits&lt;char32_t&gt; &gt; u32regex;
+typedef boost::match_results&lt;u32string::const_iterator&gt; u32smatch;
+
+int main()
+{
+	u32string text(U"C++0x のせかいへようこそ!!");
+	u32string modified;
+	u32regex reg(U"せかい");
+	u32smatch match;
+	while (boost::regex_search(text, match, reg)) {
+		modified += match.prefix().str() + U"世界";
+		text = match.suffix().str();
+	}
+	modified += text;
+	return 0;
+}
+</pre>
+<p>このサンプルは、期待通りに動作しても、何もしません。UTF-32 の文字列 <code>U"C++0x のせかいへようこそ!!"</code> の <code>U"せかい"</code> を <code>U"世界"</code> に置換する、という処理を内部で行うだけです。 <code>u32string</code> に対応した <code>iostream</code> があったとして、 UTF-32 をそのままコンソールやファイルに出しても不親切なだけなので、出力までやるなら libiconv と組み合わせるべきですが、プログラムが複雑になるので、ここではそこまで示していません (実際にはそこまで試そうとしていたのですが…)。</p>
+<p>で、このプログラム、実際はどうなるのかというと、 GCC 4.5 でコンパイルは通るものの、実行すると、 <strong><code>u32regex</code> オブジェクト</strong> (これは <code>boost::basic_regex&lt;char32_t, boost::regex_traits&lt;char32_t&gt; &gt;</code> のシノニムですね) <strong>のコンストラクタが <code>std::bad_cast</code> 例外を送出します</strong>。どうやら、 Boost.Regex は <code>char32_t</code>、すなわち 32bits 以上の整数型を文字コードに使用するということ、を想定した作りにはなっていなかったようなのです。よーするに <code>char</code> と <code>wchar_t</code> しか想定していなかったんですね (ん? でも <a href="/blog/2009/07/25/wchar_t-suck.html" title="はらぺこ日誌» ブログアーカイブ » 頼りなさげな wchar_t">GCC の <code>wchar_t</code> は <code>uint32_t</code></a> だったような…)。</p>
+<p>GCC の標準 C++ ライブラリが <code>&lt;regex&gt;</code> のライブラリを実装するのを悠長に待っても居られないので、方針を転換し、内部文字列は UTF-8 で実装せざるを得なさそうです。一応、UTF-8 は文字の先頭オクテットか否かを判断するのが容易なので (0×80≦n≦0xBF 以外なら先頭オクテット)、文字境界の特定も文字数カウントも一度関数を書いてしまえば ok なのですが…。</p>
+<p><small>2010 年 9 月 22 日 by 村山 俊之</small></p>
+
+
+</div>
+
+<p>(転載元: はらぺこ日誌 〜株式会社はらぺこ 公式ブログ〜)</p>
